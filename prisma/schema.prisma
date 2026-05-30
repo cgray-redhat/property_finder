@@ -1,0 +1,77 @@
+// Property Finder (InvestLocate) — Prisma schema
+// PostgreSQL with PostGIS for spatial property search
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis]
+}
+
+/// Application user account
+model User {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  name            String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  savedShortlists SavedShortlist[]
+
+  @@map("users")
+}
+
+/// Active real estate listing with cash-flow analysis inputs
+model Property {
+  id           String         @id @default(cuid())
+  externalId   String?        @unique @map("external_id")
+  address      String
+  city         String
+  state        String
+  zipCode      String         @map("zip_code")
+  listingPrice Decimal        @map("listing_price") @db.Decimal(12, 2)
+  bedrooms     Int?
+  bathrooms    Decimal?       @db.Decimal(3, 1)
+  sqft         Int?
+  /// WGS84 latitude — kept in sync with PostGIS location column
+  latitude     Float
+  /// WGS84 longitude — kept in sync with PostGIS location column
+  longitude    Float
+  /// PostGIS point geometry (SRID 4326) for spatial search; managed via raw SQL
+  location     Unsupported("geometry(Point, 4326)")?
+  status       PropertyStatus @default(ACTIVE)
+  listedAt     DateTime?      @map("listed_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  shortlists   SavedShortlist[]
+
+  @@index([city, state])
+  @@index([latitude, longitude])
+  @@index([status])
+  @@map("properties")
+}
+
+enum PropertyStatus {
+  ACTIVE
+  PENDING
+  SOLD
+  OFF_MARKET
+}
+
+/// User-curated property shortlist for comparison and analysis
+model SavedShortlist {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  propertyId String   @map("property_id")
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+  @@index([userId])
+  @@map("saved_shortlists")
+}
