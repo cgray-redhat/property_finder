@@ -1,1 +1,1 @@
-export { useProperties } from "./use-properties";
+export { useRankedProperties, useSelectedRankedProperty } from "./use-ranked-properties";
