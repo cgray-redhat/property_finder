@@ -1,4 +1,4 @@
-import { AppHeader } from "@/components";
+import { AppHeader, PropertySearchPanel } from "@/components";
 
 export default function Home() {
   return (
@@ -15,6 +15,8 @@ export default function Home() {
             shortlists for comparison. Spatial search is powered by PostGIS.
           </p>
         </section>
+
+        <PropertySearchPanel />
 
         <section className="grid gap-4 sm:grid-cols-3">
           {[

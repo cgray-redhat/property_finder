@@ -1,76 +1,166 @@
 import { NextResponse } from "next/server";
-import { parseSearchLocation } from "@/lib/integrations";
-import { runPropertySearchPipeline } from "@/lib/pipeline/property-search";
+import {
+  buildSearchResponse,
+  enrichListingsWithMarketData,
+} from "@/lib/rentcast/enrich";
+import {
+  fetchRentCastMarketData,
+  fetchRentCastSaleListings,
+} from "@/lib/rentcast/client";
+import {
+  createEmptySearchResponse,
+  type PropertySearchErrorCode,
+  type PropertySearchResponse,
+} from "@/types/property";
 
 export const runtime = "nodejs";
 
-type SearchParams = {
-  location?: string;
-  zip?: string;
-  city?: string;
-  state?: string;
-  neighborhood?: string;
-};
+const ZIP_PATTERN = /^\d{5}$/;
 
-function getSearchParams(request: Request): SearchParams {
-  const { searchParams } = new URL(request.url);
+function resolveZipCode(searchParams: URLSearchParams): string | null {
+  return (
+    searchParams.get("zipCode")?.trim() ??
+    searchParams.get("zip")?.trim() ??
+    (ZIP_PATTERN.test(searchParams.get("location")?.trim() ?? "")
+      ? searchParams.get("location")!.trim()
+      : null)
+  );
+}
 
-  return {
-    location: searchParams.get("location") ?? undefined,
-    zip: searchParams.get("zip") ?? undefined,
-    city: searchParams.get("city") ?? undefined,
-    state: searchParams.get("state") ?? undefined,
-    neighborhood: searchParams.get("neighborhood") ?? undefined,
-  };
+function errorStatus(code: PropertySearchErrorCode): number {
+  switch (code) {
+    case "MISSING_ZIP_CODE":
+    case "INVALID_ZIP_CODE":
+      return 400;
+    case "MISSING_API_KEY":
+      return 503;
+    case "RENTCAST_UNAUTHORIZED":
+      return 401;
+    case "RENTCAST_RATE_LIMITED":
+      return 429;
+    default:
+      return 502;
+  }
+}
+
+function jsonResponse(body: PropertySearchResponse, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+      "X-Data-Last-Updated": body.lastUpdated,
+    },
+  });
 }
 
 /**
- * GET /api/properties/search
+ * GET /api/properties/search?zipCode=78723
  *
- * Query by city, zip, or neighborhood:
- *   ?location=94110
- *   ?location=Austin,TX
- *   ?neighborhood=Mission District&city=San Francisco&state=CA
- *   ?zip=78701
+ * Fetches active for-sale listings and zip-level rental market benchmarks
+ * from RentCast, then returns a blended standardized JSON payload.
  */
 export async function GET(request: Request) {
-  try {
-    const params = getSearchParams(request);
+  const zipCode = resolveZipCode(new URL(request.url).searchParams);
 
-    if (
-      !params.location &&
-      !params.zip &&
-      !params.city &&
-      !params.neighborhood
-    ) {
-      return NextResponse.json(
-        {
-          error: "Missing location query",
-          message:
-            "Provide location, zip, city, or neighborhood query parameters.",
-          examples: [
-            "/api/properties/search?location=94110",
-            "/api/properties/search?location=Austin,TX",
-            "/api/properties/search?neighborhood=Mission District&city=San Francisco&state=CA",
-          ],
-        },
-        { status: 400 },
+  if (!zipCode) {
+    return jsonResponse(
+      createEmptySearchResponse("", {
+        code: "MISSING_ZIP_CODE",
+        message:
+          "A zipCode query parameter is required (e.g. ?zipCode=78723).",
+      }),
+      400,
+    );
+  }
+
+  if (!ZIP_PATTERN.test(zipCode)) {
+    return jsonResponse(
+      createEmptySearchResponse(zipCode, {
+        code: "INVALID_ZIP_CODE",
+        message: "zipCode must be a 5-digit US zip code.",
+      }),
+      400,
+    );
+  }
+
+  try {
+    const [listingsResult, marketResult] = await Promise.all([
+      fetchRentCastSaleListings(zipCode),
+      fetchRentCastMarketData(zipCode),
+    ]);
+
+    if (!listingsResult.ok) {
+      return jsonResponse(
+        createEmptySearchResponse(zipCode, {
+          code: listingsResult.code as PropertySearchErrorCode,
+          message: listingsResult.message,
+        }),
+        errorStatus(listingsResult.code as PropertySearchErrorCode),
       );
     }
 
-    const searchLocation = parseSearchLocation(params);
-    const result = await runPropertySearchPipeline(searchLocation);
+    const warnings: string[] = [];
+    let marketData = null;
 
-    return NextResponse.json(result, {
-      headers: {
-        "Cache-Control": "no-store",
-        "X-Data-Last-Updated": result.lastUpdated,
-      },
-    });
+    if (!marketResult.ok) {
+      if (marketResult.code === "RENTCAST_UNAUTHORIZED") {
+        return jsonResponse(
+          createEmptySearchResponse(zipCode, {
+            code: "RENTCAST_UNAUTHORIZED",
+            message: marketResult.message,
+          }),
+          401,
+        );
+      }
+
+      if (marketResult.code === "RENTCAST_RATE_LIMITED") {
+        return jsonResponse(
+          createEmptySearchResponse(zipCode, {
+            code: "RENTCAST_RATE_LIMITED",
+            message: marketResult.message,
+          }),
+          429,
+        );
+      }
+
+      warnings.push(`Market data unavailable: ${marketResult.message}`);
+    } else {
+      marketData = marketResult.data;
+    }
+
+    const lastUpdated = new Date().toISOString();
+    const listings = Array.isArray(listingsResult.data)
+      ? listingsResult.data
+      : [];
+
+    if (listings.length === 0) {
+      warnings.push("No active listings returned for this zip code.");
+    }
+
+    const properties = enrichListingsWithMarketData(
+      listings,
+      marketData,
+      lastUpdated,
+    );
+
+    const response = buildSearchResponse(
+      zipCode,
+      properties,
+      marketData,
+      warnings,
+    );
+
+    return jsonResponse(response);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Property search failed";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonResponse(
+      createEmptySearchResponse(zipCode, {
+        code: "RENTCAST_ERROR",
+        message,
+      }),
+      502,
+    );
   }
 }

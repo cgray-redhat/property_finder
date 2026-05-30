@@ -1,11 +1,10 @@
 export type PropertySearchQuery = {
-  location?: string;
+  zipCode?: string;
+  /** @deprecated Use zipCode — kept for search form compatibility */
   zip?: string;
-  city?: string;
-  state?: string;
-  neighborhood?: string;
+  location?: string;
 };
 
-export type PropertySearchResponse = import("@/lib/pipeline/property-search").PropertySearchPipelineResult;
+export type { PropertySearchResponse } from "@/types/property";
 
 export const PROPERTY_SEARCH_API = "/api/properties/search";
