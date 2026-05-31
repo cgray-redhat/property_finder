@@ -19,6 +19,10 @@ function buildResponse(
       lotCount: 2,
       listingsScope: "first_page",
       hasMoreListings: true,
+      appliedFilters: {
+        propertyMinBedrooms: 1,
+        propertyMaxPrice: 500_000,
+      },
       dataSource: "rentcast",
       partial: false,
       warnings: [],
@@ -31,7 +35,21 @@ describe("isCachedSearchFresh", () => {
   it("returns true for a recent matching zip search", () => {
     const results = buildResponse();
 
-    expect(isCachedSearchFresh(results, "78723")).toBe(true);
+    expect(
+      isCachedSearchFresh(results, "78723", {
+        filters: { propertyMinBedrooms: 1, propertyMaxPrice: 500_000 },
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when filters differ", () => {
+    const results = buildResponse();
+
+    expect(
+      isCachedSearchFresh(results, "78723", {
+        filters: { propertyMinBedrooms: 3 },
+      }),
+    ).toBe(false);
   });
 
   it("returns false for a different zip", () => {

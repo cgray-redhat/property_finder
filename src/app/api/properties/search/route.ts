@@ -11,6 +11,7 @@ import {
   LISTINGS_CACHE_TTL_MS,
   LISTINGS_MAX_RESULTS,
 } from "@/lib/rentcast/cache-policy";
+import { parseListingFiltersFromSearchParams } from "@/lib/rentcast/listing-filters";
 import {
   createEmptySearchResponse,
   type PropertySearchErrorCode,
@@ -62,14 +63,15 @@ function jsonResponse(body: PropertySearchResponse, status = 200) {
 /**
  * GET /api/properties/search?zipCode=78723
  * GET /api/properties/search?zipCode=78723&loadAll=true
+ * GET /api/properties/search?zipCode=78723&propertyMinBedrooms=3&propertyMaxPrice=500000
  *
- * Fetches active for-sale listings and zip-level rental market benchmarks
- * from RentCast (with server-side TTL caching), then returns a blended payload.
+ * Fetches filtered property + land listing streams and zip market benchmarks.
  */
 export async function GET(request: Request) {
   const searchParams = new URL(request.url).searchParams;
   const zipCode = resolveZipCode(searchParams);
   const loadAll = searchParams.get("loadAll") === "true";
+  const filters = parseListingFiltersFromSearchParams(searchParams);
 
   if (!zipCode) {
     return jsonResponse(
@@ -94,7 +96,7 @@ export async function GET(request: Request) {
 
   try {
     const [listingsResult, marketResult] = await Promise.all([
-      getCachedListings(zipCode, loadAll),
+      getCachedListings(zipCode, loadAll, filters),
       getCachedMarketData(zipCode),
     ]);
 
@@ -108,7 +110,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const warnings: string[] = [];
+    const warnings: string[] = [...(listingsResult.warnings ?? [])];
     let marketData = null;
 
     if (!marketResult.ok) {
@@ -137,10 +139,13 @@ export async function GET(request: Request) {
       marketData = marketResult.data;
     }
 
-    const { listings, scope, hasMoreListings, fetchedAt } = listingsResult.data;
+    const { listings, scope, hasMoreListings, fetchedAt, filters: appliedFilters } =
+      listingsResult.data;
 
     if (listings.length === 0) {
-      warnings.push("No active listings returned for this zip code.");
+      warnings.push(
+        "No listings matched your zip and filters. Try widening price or bed criteria.",
+      );
     }
 
     if (loadAll && listings.length >= LISTINGS_MAX_RESULTS) {
@@ -151,7 +156,7 @@ export async function GET(request: Request) {
 
     if (!loadAll && hasMoreListings) {
       warnings.push(
-        `Showing the first ${listings.length} listings. Use "Load all listings" to fetch the rest.`,
+        `Showing the first page of filtered results. Use "Load all listings" to fetch additional pages.`,
       );
     }
 
@@ -166,7 +171,11 @@ export async function GET(request: Request) {
       properties,
       marketData,
       warnings,
-      { listingsScope: scope, hasMoreListings: loadAll ? false : hasMoreListings },
+      {
+        listingsScope: scope,
+        hasMoreListings: loadAll ? false : hasMoreListings,
+        appliedFilters,
+      },
     );
 
     return jsonResponse(response);

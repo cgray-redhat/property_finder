@@ -3,11 +3,19 @@ import {
   isWithinTtl,
   LISTINGS_CACHE_TTL_MS,
 } from "@/lib/rentcast/cache-policy";
+import {
+  listingSearchFiltersEqual,
+  normalizeListingSearchFilters,
+  type ListingSearchFilters,
+} from "@/lib/rentcast/listing-filters";
 
 export function isCachedSearchFresh(
   results: PropertySearchResponse | null,
   zipCode: string,
-  options: { requireAllListings?: boolean } = {},
+  options: {
+    requireAllListings?: boolean;
+    filters?: ListingSearchFilters;
+  } = {},
 ): boolean {
   if (!results?.success) {
     return false;
@@ -21,6 +29,17 @@ export function isCachedSearchFresh(
 
   if (!isWithinTtl(results.lastUpdated, LISTINGS_CACHE_TTL_MS)) {
     return false;
+  }
+
+  if (options.filters != null) {
+    const requested = normalizeListingSearchFilters(options.filters);
+    const applied = normalizeListingSearchFilters(
+      results.meta.appliedFilters ?? {},
+    );
+
+    if (!listingSearchFiltersEqual(requested, applied)) {
+      return false;
+    }
   }
 
   if (

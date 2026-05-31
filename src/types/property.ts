@@ -1,4 +1,7 @@
 /** RentCast sale listing record (subset of API response). */
+import type { ListingSearchFilters } from "@/lib/rentcast/listing-filters";
+import { DEFAULT_LISTING_SEARCH_FILTERS } from "@/lib/rentcast/listing-filters";
+
 export type RentCastSaleListing = {
   id: string;
   formattedAddress: string;
@@ -119,6 +122,8 @@ export type PropertySearchMeta = {
   listingsScope: "first_page" | "all";
   /** True when more listings may exist beyond the first page. */
   hasMoreListings: boolean;
+  /** Filters applied to the RentCast listing queries. */
+  appliedFilters: ListingSearchFilters;
   dataSource: "rentcast";
   partial: boolean;
   warnings: string[];
@@ -166,6 +171,7 @@ export function createEmptySearchResponse(
       lotCount: 0,
       listingsScope: "first_page",
       hasMoreListings: false,
+      appliedFilters: { ...DEFAULT_LISTING_SEARCH_FILTERS },
       dataSource: "rentcast",
       partial: false,
       warnings: [],

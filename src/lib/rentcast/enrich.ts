@@ -7,6 +7,8 @@ import type {
   RentalBenchmarks,
 } from "@/types/property";
 import { filterForAppMode } from "@/lib/property-classification";
+import type { ListingSearchFilters } from "@/lib/rentcast/listing-filters";
+import { normalizeListingSearchFilters } from "@/lib/rentcast/listing-filters";
 
 function pickRentalBenchmarks(
   bedrooms: number | null | undefined,
@@ -97,11 +99,15 @@ export function buildSearchResponse(
   options: {
     listingsScope?: "first_page" | "all";
     hasMoreListings?: boolean;
+    appliedFilters?: ListingSearchFilters;
   } = {},
 ): PropertySearchResponse {
   const lastUpdated = new Date().toISOString();
   const listingsScope = options.listingsScope ?? "first_page";
   const hasMoreListings = options.hasMoreListings ?? false;
+  const appliedFilters = normalizeListingSearchFilters(
+    options.appliedFilters ?? {},
+  );
 
   const propertyCount = filterForAppMode(listings, "property_finder").length;
   const lotCount = filterForAppMode(listings, "lot_finder").length;
@@ -119,6 +125,7 @@ export function buildSearchResponse(
       lotCount,
       listingsScope,
       hasMoreListings,
+      appliedFilters,
       dataSource: "rentcast",
       partial: warnings.length > 0,
       warnings,

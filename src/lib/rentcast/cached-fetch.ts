@@ -7,9 +7,16 @@ import {
 } from "@/lib/rentcast/cache-policy";
 import {
   fetchRentCastMarketData,
-  fetchRentCastSaleListings,
+  fetchRentCastSaleListingsQuery,
   type RentCastFetchResult,
 } from "@/lib/rentcast/client";
+import {
+  buildLotListingQuery,
+  buildPropertyListingQuery,
+  listingFiltersCacheKey,
+  normalizeListingSearchFilters,
+  type ListingSearchFilters,
+} from "@/lib/rentcast/listing-filters";
 import { TtlCache } from "@/lib/rentcast/ttl-cache";
 
 type CachedListings = {
@@ -17,17 +24,95 @@ type CachedListings = {
   scope: ListingsScope;
   hasMoreListings: boolean;
   fetchedAt: string;
+  filters: ListingSearchFilters;
 };
 
 const marketCache = new TtlCache<RentCastMarketData>();
 const listingsCache = new TtlCache<CachedListings>();
 
-function listingsCacheKey(zipCode: string, scope: ListingsScope): string {
-  return `listings:${zipCode}:${scope}`;
+function listingsCacheKey(
+  zipCode: string,
+  scope: ListingsScope,
+  filters: ListingSearchFilters,
+): string {
+  return `listings:${zipCode}:${scope}:${listingFiltersCacheKey(filters)}`;
 }
 
 function marketCacheKey(zipCode: string): string {
   return `market:${zipCode}`;
+}
+
+function dedupeListings(listings: RentCastSaleListing[]): RentCastSaleListing[] {
+  const seen = new Set<string>();
+
+  return listings.filter((listing) => {
+    if (seen.has(listing.id)) {
+      return false;
+    }
+
+    seen.add(listing.id);
+    return true;
+  });
+}
+
+async function fetchMergedListings(
+  zipCode: string,
+  filters: ListingSearchFilters,
+  loadAll: boolean,
+): Promise<
+  RentCastFetchResult<CachedListings> & {
+    warnings?: string[];
+  }
+> {
+  const normalizedFilters = normalizeListingSearchFilters(filters);
+  const propertyQuery = {
+    zipCode,
+    ...buildPropertyListingQuery(zipCode, normalizedFilters),
+  };
+  const lotQuery = {
+    zipCode,
+    ...buildLotListingQuery(zipCode, normalizedFilters),
+  };
+
+  const [propertyResult, lotResult] = await Promise.all([
+    fetchRentCastSaleListingsQuery(propertyQuery, { loadAll }),
+    fetchRentCastSaleListingsQuery(lotQuery, { loadAll }),
+  ]);
+
+  const warnings: string[] = [];
+
+  if (!propertyResult.ok && !lotResult.ok) {
+    return propertyResult;
+  }
+
+  if (!propertyResult.ok) {
+    warnings.push(`Property listings unavailable: ${propertyResult.message}`);
+  }
+
+  if (!lotResult.ok) {
+    warnings.push(`Land listings unavailable: ${lotResult.message}`);
+  }
+
+  const propertyListings = propertyResult.ok ? propertyResult.data : [];
+  const lotListings = lotResult.ok ? lotResult.data : [];
+  const listings = dedupeListings([...propertyListings, ...lotListings]);
+
+  const propertyHasMore =
+    !loadAll && propertyListings.length >= LISTINGS_PAGE_SIZE;
+  const lotHasMore = !loadAll && lotListings.length >= LISTINGS_PAGE_SIZE;
+
+  return {
+    ok: true,
+    data: {
+      listings,
+      scope: loadAll ? "all" : "first_page",
+      hasMoreListings: propertyHasMore || lotHasMore,
+      fetchedAt: new Date().toISOString(),
+      filters: normalizedFilters,
+    },
+    status: 200,
+    warnings,
+  };
 }
 
 export async function getCachedMarketData(
@@ -51,37 +136,37 @@ export async function getCachedMarketData(
 export async function getCachedListings(
   zipCode: string,
   loadAll: boolean,
+  filters: ListingSearchFilters = {},
 ): Promise<
-  RentCastFetchResult<CachedListings> & { fromCache?: boolean }
+  RentCastFetchResult<CachedListings> & {
+    fromCache?: boolean;
+    warnings?: string[];
+  }
 > {
+  const normalizedFilters = normalizeListingSearchFilters(filters);
   const scope: ListingsScope = loadAll ? "all" : "first_page";
-  const cacheKey = listingsCacheKey(zipCode, scope);
+  const cacheKey = listingsCacheKey(zipCode, scope, normalizedFilters);
   const cached = listingsCache.get(cacheKey);
 
   if (cached) {
     return { ok: true, data: cached, status: 200, fromCache: true };
   }
 
-  const result = await fetchRentCastSaleListings(zipCode, { loadAll });
+  const result = await fetchMergedListings(zipCode, normalizedFilters, loadAll);
 
   if (!result.ok) {
     return result;
   }
 
-  const listings = Array.isArray(result.data) ? result.data : [];
-  const hasMoreListings =
-    !loadAll && listings.length >= LISTINGS_PAGE_SIZE;
+  listingsCache.set(cacheKey, result.data, LISTINGS_CACHE_TTL_MS);
 
-  const payload: CachedListings = {
-    listings,
-    scope,
-    hasMoreListings,
-    fetchedAt: new Date().toISOString(),
+  return {
+    ok: true,
+    data: result.data,
+    status: result.status,
+    fromCache: false,
+    warnings: result.warnings,
   };
-
-  listingsCache.set(cacheKey, payload, LISTINGS_CACHE_TTL_MS);
-
-  return { ok: true, data: payload, status: result.status, fromCache: false };
 }
 
 /** Test helper — clears module-level caches between test runs. */

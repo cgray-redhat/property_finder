@@ -1,24 +1,20 @@
-import type {
-  RentCastMarketData,
-  RentCastSaleListing,
-} from "@/types/property";
+import type { RentCastMarketData, RentCastSaleListing } from "@/types/property";
 import {
   LISTINGS_MAX_RESULTS,
   LISTINGS_PAGE_SIZE,
 } from "@/lib/rentcast/cache-policy";
+import type { RentCastListingQuery } from "@/lib/rentcast/listing-filters";
 
-export { LISTINGS_PAGE_SIZE, LISTINGS_MAX_RESULTS };
-
-const RENTCAST_BASE_URL = "https://api.rentcast.io/v1";
+export type RentCastFetchResult<T> =
+  | { ok: true; data: T; status: number }
+  | { ok: false; status: number; code: string; message: string };
 
 export type FetchListingsOptions = {
   /** When false (default), only the first page (500) is fetched. */
   loadAll?: boolean;
 };
 
-export type RentCastFetchResult<T> =
-  | { ok: true; data: T; status: number }
-  | { ok: false; status: number; code: string; message: string };
+const RENTCAST_BASE_URL = "https://api.rentcast.io/v1";
 
 function getApiKey(): string | undefined {
   return process.env.RENTCAST_API_KEY?.trim() || undefined;
@@ -80,8 +76,34 @@ async function rentCastFetch<T>(
   return { ok: true, data, status: response.status };
 }
 
-export async function fetchRentCastSaleListings(
-  zipCode: string,
+function buildListingSearchParams(
+  query: RentCastListingQuery,
+  offset: number,
+): URLSearchParams {
+  const params = new URLSearchParams({
+    zipCode: query.zipCode,
+    status: "Active",
+    limit: String(LISTINGS_PAGE_SIZE),
+    offset: String(offset),
+  });
+
+  if (query.bedrooms) {
+    params.set("bedrooms", query.bedrooms);
+  }
+
+  if (query.price) {
+    params.set("price", query.price);
+  }
+
+  if (query.propertyType) {
+    params.set("propertyType", query.propertyType);
+  }
+
+  return params;
+}
+
+export async function fetchRentCastSaleListingsQuery(
+  query: RentCastListingQuery,
   options: FetchListingsOptions = {},
 ): Promise<RentCastFetchResult<RentCastSaleListing[]>> {
   const { loadAll = false } = options;
@@ -100,13 +122,7 @@ export async function fetchRentCastSaleListings(
   let offset = 0;
 
   do {
-    const params = new URLSearchParams({
-      zipCode,
-      status: "Active",
-      limit: String(LISTINGS_PAGE_SIZE),
-      offset: String(offset),
-    });
-
+    const params = buildListingSearchParams(query, offset);
     const pageResult = await rentCastFetch<RentCastSaleListing[]>(
       `/listings/sale?${params.toString()}`,
       apiKey,
@@ -160,3 +176,5 @@ export async function fetchRentCastMarketData(
 export function isRentCastConfigured(): boolean {
   return Boolean(getApiKey());
 }
+
+export { LISTINGS_PAGE_SIZE, LISTINGS_MAX_RESULTS };

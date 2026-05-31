@@ -38,7 +38,9 @@ describe("buildSearchResponse", () => {
       propertyType: "Land",
     };
 
-    const response = buildSearchResponse("78723", [rental, lot], null, []);
+    const response = buildSearchResponse("78723", [rental, lot], null, [], {
+      appliedFilters: { propertyMinBedrooms: 1 },
+    });
 
     expect(response.meta.listingCount).toBe(2);
     expect(response.meta.propertyCount).toBe(1);

@@ -7,7 +7,9 @@ import {
   type PropertySearchQuery,
   type PropertySearchResponse,
 } from "@/lib/api/search";
+import { describeListingFilters } from "@/lib/rentcast/listing-filters";
 import { isCachedSearchFresh } from "@/lib/search-freshness";
+import { SearchListingFilters } from "@/components/search/search-listing-filters";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
 
 const inputClassName =
@@ -21,6 +23,8 @@ export function PropertySearchPanel() {
   const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const setSearchResults = useInvestLocateStore((state) => state.setSearchResults);
   const searchResults = useInvestLocateStore((state) => state.searchResults);
+  const searchFilters = useInvestLocateStore((state) => state.searchFilters);
+  const setSearchFilters = useInvestLocateStore((state) => state.setSearchFilters);
 
   useEffect(() => {
     if (searchResults?.zipCode) {
@@ -28,10 +32,13 @@ export function PropertySearchPanel() {
     }
   }, [searchResults?.zipCode]);
 
-  async function runSearch(query: PropertySearchQuery) {
-    const trimmedZip =
-      query.zipCode?.trim() || query.zip?.trim() || query.location?.trim() || "";
+  useEffect(() => {
+    if (searchResults?.meta.appliedFilters) {
+      setSearchFilters(searchResults.meta.appliedFilters);
+    }
+  }, [searchResults?.meta.appliedFilters, setSearchFilters]);
 
+  async function runSearch(query: PropertySearchQuery) {
     setError(null);
     setCacheNotice(null);
 
@@ -59,9 +66,13 @@ export function PropertySearchPanel() {
       return;
     }
 
-    if (isCachedSearchFresh(searchResults, zipCode.trim())) {
+    if (
+      isCachedSearchFresh(searchResults, zipCode.trim(), {
+        filters: searchFilters,
+      })
+    ) {
       setCacheNotice(
-        `Using cached results for ${zipCode.trim()} (refreshes every 30 minutes).`,
+        `Using cached results for ${zipCode.trim()} with the current filters.`,
       );
       return;
     }
@@ -69,7 +80,11 @@ export function PropertySearchPanel() {
     setIsLoading(true);
 
     try {
-      await runSearch({ zipCode: zipCode.trim(), loadAll: false });
+      await runSearch({
+        zipCode: zipCode.trim(),
+        loadAll: false,
+        filters: searchFilters,
+      });
     } catch (err) {
       setSearchResults(null);
       setError(err instanceof Error ? err.message : "Search failed");
@@ -83,12 +98,15 @@ export function PropertySearchPanel() {
       return;
     }
 
+    const filters = searchResults.meta.appliedFilters ?? searchFilters;
+
     if (
       isCachedSearchFresh(searchResults, searchResults.zipCode, {
         requireAllListings: true,
+        filters,
       })
     ) {
-      setCacheNotice("All listings for this zip are already loaded.");
+      setCacheNotice("All filtered listings for this zip are already loaded.");
       return;
     }
 
@@ -97,7 +115,11 @@ export function PropertySearchPanel() {
     setCacheNotice(null);
 
     try {
-      await runSearch({ zipCode: searchResults.zipCode, loadAll: true });
+      await runSearch({
+        zipCode: searchResults.zipCode,
+        loadAll: true,
+        filters,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load all listings");
     } finally {
@@ -110,6 +132,8 @@ export function PropertySearchPanel() {
     searchResults.meta.hasMoreListings &&
     searchResults.meta.listingsScope === "first_page";
 
+  const filterSummary = describeListingFilters(searchFilters);
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -118,12 +142,18 @@ export function PropertySearchPanel() {
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-zinc-900">Search by zip code</h2>
         <p className="text-sm text-zinc-600">
-          One search loads up to {LISTINGS_PAGE_SIZE.toLocaleString()} active MLS
-          listings from RentCast. Property Finder and Lot Finder share the same
-          results — switch tabs without searching again. Repeat searches within
-          30 minutes use cached data.
+          Filters are applied at RentCast before results are downloaded — up to{" "}
+          {LISTINGS_PAGE_SIZE.toLocaleString()} listings per stream (properties +
+          land). Both modes share one search. Cached for 30 minutes per zip +
+          filter combination.
         </p>
       </div>
+
+      <SearchListingFilters
+        filters={searchFilters}
+        onChange={setSearchFilters}
+        disabled={isLoading || isLoadingAll}
+      />
 
       <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
         <label className="flex flex-1 flex-col gap-1.5">
@@ -148,6 +178,10 @@ export function PropertySearchPanel() {
         </button>
       </div>
 
+      <p className="mt-3 text-xs text-zinc-500">
+        Property stream: {filterSummary.property}. Lot stream: {filterSummary.lot}.
+      </p>
+
       {searchResults?.success && (
         <div className="mt-4 flex flex-col gap-3">
           <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
@@ -159,7 +193,7 @@ export function PropertySearchPanel() {
             {searchResults.meta.lotCount === 1 ? "" : "s"}.
             {searchResults.meta.listingsScope === "first_page" &&
               searchResults.meta.hasMoreListings &&
-              " More listings may be available."}
+              " More filtered listings may be available."}
           </p>
 
           {showLoadAll && (
