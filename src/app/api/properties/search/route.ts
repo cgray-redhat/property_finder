@@ -14,6 +14,11 @@ import {
 import { enrichLotListingsFromRecords } from "@/lib/rentcast/lot-enrichment";
 import { parseListingFiltersFromSearchParams } from "@/lib/rentcast/listing-filters";
 import {
+  getMlsFixtureMeta,
+  getMlsFixtureZipCode,
+  isMlsFixtureModeEnabled,
+} from "@/lib/fixtures/mls-fixture";
+import {
   createEmptySearchResponse,
   type PropertySearchErrorCode,
   type PropertySearchResponse,
@@ -95,6 +100,16 @@ export async function GET(request: Request) {
     );
   }
 
+  if (isMlsFixtureModeEnabled() && zipCode !== getMlsFixtureZipCode()) {
+    return jsonResponse(
+      createEmptySearchResponse(zipCode, {
+        code: "INVALID_ZIP_CODE",
+        message: `Fixture mode is active. Search ${getMlsFixtureZipCode()} only while using saved MLS test data.`,
+      }),
+      400,
+    );
+  }
+
   try {
     const [listingsResult, marketResult] = await Promise.all([
       getCachedListings(zipCode, loadAll, filters),
@@ -112,6 +127,13 @@ export async function GET(request: Request) {
     }
 
     const warnings: string[] = [...(listingsResult.warnings ?? [])];
+
+    if (isMlsFixtureModeEnabled()) {
+      warnings.unshift(
+        `Using saved MLS test data for ${getMlsFixtureZipCode()} captured on ${getMlsFixtureMeta().capturedDate}. Live RentCast requests are disabled.`,
+      );
+    }
+
     let marketData = null;
 
     if (!marketResult.ok) {
@@ -176,9 +198,15 @@ export async function GET(request: Request) {
       marketData,
       warnings,
       {
-        listingsScope: scope,
-        hasMoreListings: loadAll ? false : hasMoreListings,
+        listingsScope: isMlsFixtureModeEnabled() ? "all" : scope,
+        hasMoreListings: isMlsFixtureModeEnabled() ? false : loadAll ? false : hasMoreListings,
         appliedFilters,
+        ...(isMlsFixtureModeEnabled()
+          ? {
+              dataSource: "mls_fixture" as const,
+              mlsFixture: getMlsFixtureMeta(),
+            }
+          : {}),
       },
     );
 

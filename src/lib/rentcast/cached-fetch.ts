@@ -1,3 +1,9 @@
+import {
+  filterMlsFixtureListings,
+  getMlsFixture,
+  getMlsFixtureMarketData,
+  isMlsFixtureModeEnabled,
+} from "@/lib/fixtures/mls-fixture";
 import type { RentCastMarketData, RentCastSaleListing } from "@/types/property";
 import {
   LISTINGS_CACHE_TTL_MS,
@@ -118,6 +124,10 @@ async function fetchMergedListings(
 export async function getCachedMarketData(
   zipCode: string,
 ): Promise<RentCastFetchResult<RentCastMarketData>> {
+  if (isMlsFixtureModeEnabled()) {
+    return { ok: true, data: getMlsFixtureMarketData(), status: 200 };
+  }
+
   const cached = marketCache.get(marketCacheKey(zipCode));
 
   if (cached) {
@@ -144,6 +154,25 @@ export async function getCachedListings(
   }
 > {
   const normalizedFilters = normalizeListingSearchFilters(filters);
+
+  if (isMlsFixtureModeEnabled()) {
+    const fixture = getMlsFixture();
+    const listings = filterMlsFixtureListings(normalizedFilters);
+
+    return {
+      ok: true,
+      data: {
+        listings,
+        scope: "all",
+        hasMoreListings: false,
+        fetchedAt: fixture.capturedAt,
+        filters: normalizedFilters,
+      },
+      status: 200,
+      fromCache: true,
+    };
+  }
+
   const scope: ListingsScope = loadAll ? "all" : "first_page";
   const cacheKey = listingsCacheKey(zipCode, scope, normalizedFilters);
   const cached = listingsCache.get(cacheKey);

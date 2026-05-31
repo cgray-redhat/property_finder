@@ -1,5 +1,7 @@
 import type {
   EnrichedPropertyListing,
+  MlsFixtureMeta,
+  PropertySearchDataSource,
   PropertySearchResponse,
   RentCastMarketData,
   RentCastRentalData,
@@ -106,6 +108,8 @@ export function buildSearchResponse(
     listingsScope?: "first_page" | "all";
     hasMoreListings?: boolean;
     appliedFilters?: ListingSearchFilters;
+    dataSource?: PropertySearchDataSource;
+    mlsFixture?: MlsFixtureMeta;
   } = {},
 ): PropertySearchResponse {
   const lastUpdated = new Date().toISOString();
@@ -114,6 +118,7 @@ export function buildSearchResponse(
   const appliedFilters = normalizeListingSearchFilters(
     options.appliedFilters ?? {},
   );
+  const dataSource = options.dataSource ?? "rentcast";
 
   const propertyCount = filterForAppMode(listings, "property_finder").length;
   const lotCount = filterForAppMode(listings, "lot_finder").length;
@@ -132,7 +137,8 @@ export function buildSearchResponse(
       listingsScope,
       hasMoreListings,
       appliedFilters,
-      dataSource: "rentcast",
+      dataSource,
+      ...(options.mlsFixture ? { mlsFixture: options.mlsFixture } : {}),
       partial: warnings.length > 0,
       warnings,
     },

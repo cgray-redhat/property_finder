@@ -1,4 +1,8 @@
 import { isLotListing } from "@/lib/property-classification";
+import {
+  getMlsFixturePropertyRecord,
+  isMlsFixtureModeEnabled,
+} from "@/lib/fixtures/mls-fixture";
 import { TtlCache } from "@/lib/rentcast/ttl-cache";
 import {
   fetchRentCastPropertyRecord,
@@ -42,6 +46,10 @@ async function mapWithConcurrency<T, R>(
 async function getPropertyRecordForLot(
   listing: EnrichedPropertyListing,
 ): Promise<RentCastPropertyRecord | null> {
+  if (isMlsFixtureModeEnabled()) {
+    return getMlsFixturePropertyRecord(listing.id);
+  }
+
   const cacheKey = cacheKeyForListing(listing);
   const cached = propertyRecordCache.get(cacheKey);
 

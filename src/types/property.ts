@@ -132,6 +132,14 @@ export type PropertySearchError = {
   message: string;
 };
 
+export type PropertySearchDataSource = "rentcast" | "mls_fixture";
+
+export type MlsFixtureMeta = {
+  sourceZipCode: string;
+  capturedDate: string;
+  sourceLabel: string;
+};
+
 export type PropertySearchMeta = {
   zipCode: string;
   listingCount: number;
@@ -145,7 +153,8 @@ export type PropertySearchMeta = {
   hasMoreListings: boolean;
   /** Filters applied to the RentCast listing queries. */
   appliedFilters: ListingSearchFilters;
-  dataSource: "rentcast";
+  dataSource: PropertySearchDataSource;
+  mlsFixture?: MlsFixtureMeta;
   partial: boolean;
   warnings: string[];
 };

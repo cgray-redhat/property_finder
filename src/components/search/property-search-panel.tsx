@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   buildSearchUrl,
   LISTINGS_PAGE_SIZE,
@@ -8,19 +8,28 @@ import {
   type PropertySearchResponse,
 } from "@/lib/api/search";
 import { describeListingFilters } from "@/lib/rentcast/listing-filters";
+import {
+  getPublicMlsFixtureZip,
+  isPublicMlsFixtureModeEnabled,
+} from "@/lib/fixtures/public-fixture-config";
 import { isCachedSearchFresh } from "@/lib/search-freshness";
+import { MlsFixtureBanner } from "@/components/search/MlsFixtureBanner";
 import { SearchListingFilters } from "@/components/search/search-listing-filters";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
+
+const fixtureModeEnabled = isPublicMlsFixtureModeEnabled();
+const fixtureZipCode = getPublicMlsFixtureZip();
 
 const inputClassName =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20";
 
 export function PropertySearchPanel() {
-  const [zipCode, setZipCode] = useState("");
+  const [zipCode, setZipCode] = useState(fixtureModeEnabled ? fixtureZipCode : "");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cacheNotice, setCacheNotice] = useState<string | null>(null);
+  const autoSearchStarted = useRef(false);
   const setSearchResults = useInvestLocateStore((state) => state.setSearchResults);
   const searchResults = useInvestLocateStore((state) => state.searchResults);
   const searchFilters = useInvestLocateStore((state) => state.searchFilters);
@@ -37,6 +46,34 @@ export function PropertySearchPanel() {
       setSearchFilters(searchResults.meta.appliedFilters);
     }
   }, [searchResults?.meta.appliedFilters, setSearchFilters]);
+
+  useEffect(() => {
+    if (!fixtureModeEnabled || autoSearchStarted.current) {
+      return;
+    }
+
+    autoSearchStarted.current = true;
+
+    async function loadFixtureSearch() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        await runSearch({
+          zipCode: fixtureZipCode,
+          loadAll: true,
+          filters: searchFilters,
+        });
+      } catch (err) {
+        setSearchResults(null);
+        setError(err instanceof Error ? err.message : "Search failed");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadFixtureSearch();
+  }, [searchFilters, setSearchResults]);
 
   async function runSearch(query: PropertySearchQuery) {
     setError(null);
@@ -82,7 +119,7 @@ export function PropertySearchPanel() {
     try {
       await runSearch({
         zipCode: zipCode.trim(),
-        loadAll: false,
+        loadAll: fixtureModeEnabled,
         filters: searchFilters,
       });
     } catch (err) {
@@ -128,6 +165,7 @@ export function PropertySearchPanel() {
   }
 
   const showLoadAll =
+    !fixtureModeEnabled &&
     searchResults?.success &&
     searchResults.meta.hasMoreListings &&
     searchResults.meta.listingsScope === "first_page";
@@ -142,27 +180,29 @@ export function PropertySearchPanel() {
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-zinc-900">Search by zip code</h2>
         <p className="text-sm text-zinc-600">
-          Filters are applied at RentCast before results are downloaded — up to{" "}
-          {LISTINGS_PAGE_SIZE.toLocaleString()} listings per stream (properties +
-          land). Both modes share one search. Cached for 30 minutes per zip +
-          filter combination.
+          {fixtureModeEnabled
+            ? `Fixture mode is active. Search zip ${fixtureZipCode} to load saved MLS test listings with filters applied locally.`
+            : `Filters are applied at RentCast before results are downloaded — up to ${LISTINGS_PAGE_SIZE.toLocaleString()} listings per stream (properties + land). Both modes share one search. Cached for 30 minutes per zip + filter combination.`}
         </p>
       </div>
 
-      <SearchListingFilters
-        filters={searchFilters}
-        onChange={setSearchFilters}
-        disabled={isLoading || isLoadingAll}
-      />
+      <MlsFixtureBanner />
 
-      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
+      <div className="mt-4">
+        <SearchListingFilters
+          filters={searchFilters}
+          onChange={setSearchFilters}
+          disabled={isLoading || isLoadingAll}
+        />
+
+        <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
         <label className="flex flex-1 flex-col gap-1.5">
           <span className="text-sm font-medium text-zinc-700">Zip code</span>
           <input
             type="text"
             value={zipCode}
             onChange={(e) => setZipCode(e.target.value)}
-            placeholder="78723"
+            placeholder={fixtureModeEnabled ? fixtureZipCode : "78723"}
             maxLength={5}
             inputMode="numeric"
             className={inputClassName}
@@ -176,11 +216,12 @@ export function PropertySearchPanel() {
         >
           {isLoading ? "Searching…" : "Search listings"}
         </button>
-      </div>
+        </div>
 
-      <p className="mt-3 text-xs text-zinc-500">
-        Property stream: {filterSummary.property}. Lot stream: {filterSummary.lot}.
-      </p>
+        <p className="mt-3 text-xs text-zinc-500">
+          Property stream: {filterSummary.property}. Lot stream: {filterSummary.lot}.
+        </p>
+      </div>
 
       {searchResults?.success && (
         <div className="mt-4 flex flex-col gap-3">
