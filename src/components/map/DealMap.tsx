@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { getCapRateColor } from "@/lib/rank-properties";
+import { trackEvent } from "@/lib/analytics";
 import { useRankedProperties } from "@/hooks/use-ranked-properties";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
 
@@ -20,6 +21,7 @@ export function DealMap() {
   const setSelectedPropertyId = useInvestLocateStore(
     (state) => state.setSelectedPropertyId,
   );
+  const searchResults = useInvestLocateStore((state) => state.searchResults);
 
   const mappableCount = rankedProperties.filter(
     (property) => property.latitude != null && property.longitude != null,
@@ -69,7 +71,7 @@ export function DealMap() {
 
     const bounds = new mapboxgl.LngLatBounds();
 
-    for (const property of mappable) {
+    for (const [index, property] of mappable.entries()) {
       const { longitude, latitude } = property;
       if (longitude == null || latitude == null) {
         continue;
@@ -94,6 +96,13 @@ export function DealMap() {
       markerElement.addEventListener("click", (event) => {
         event.stopPropagation();
         setSelectedPropertyId(property.id);
+        trackEvent("Property Listing Clicked", {
+          property_id: property.id,
+          address: property.formattedAddress,
+          rank: index + 1,
+          zip_code: searchResults?.zipCode ?? null,
+          source: "map",
+        });
       });
 
       const marker = new mapboxgl.Marker({ element: markerElement })
@@ -105,7 +114,7 @@ export function DealMap() {
     }
 
     map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 });
-  }, [rankedProperties, selectedPropertyId, setSelectedPropertyId]);
+  }, [rankedProperties, selectedPropertyId, setSelectedPropertyId, searchResults]);
 
   if (!MAPBOX_TOKEN) {
     return (

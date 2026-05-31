@@ -11,6 +11,7 @@ export function useRankedProperties(): RankedProperty[] {
   const interestRateAnnual = useInvestLocateStore(
     (state) => state.interestRateAnnual,
   );
+  const rentOverrides = useInvestLocateStore((state) => state.rentOverrides);
 
   return useMemo(
     () =>
@@ -18,12 +19,16 @@ export function useRankedProperties(): RankedProperty[] {
         ? rankProperties(searchResults.properties, {
             downPaymentPercent,
             interestRateAnnual,
+            rentOverrides,
+            zipMedianRent:
+              searchResults.marketSummary?.rental.medianRent ?? null,
           })
         : [],
-    [searchResults, downPaymentPercent, interestRateAnnual],
+    [searchResults, downPaymentPercent, interestRateAnnual, rentOverrides],
   );
 }
 
+/** Selected property for detail drawer. */
 export function useSelectedRankedProperty(): RankedProperty | null {
   const rankedProperties = useRankedProperties();
   const selectedPropertyId = useInvestLocateStore(

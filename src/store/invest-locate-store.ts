@@ -10,10 +10,14 @@ type InvestLocateState = {
   interestRateAnnual: number;
   searchResults: PropertySearchResponse | null;
   selectedPropertyId: string | null;
+  /** Manual monthly rent overrides keyed by property id. */
+  rentOverrides: Record<string, number>;
   setDownPaymentPercent: (value: number) => void;
   setInterestRateAnnual: (value: number) => void;
   setSearchResults: (results: PropertySearchResponse | null) => void;
   setSelectedPropertyId: (id: string | null) => void;
+  setRentOverride: (propertyId: string, monthlyRent: number) => void;
+  clearRentOverride: (propertyId: string) => void;
 };
 
 export const useInvestLocateStore = create<InvestLocateState>((set) => ({
@@ -21,11 +25,25 @@ export const useInvestLocateStore = create<InvestLocateState>((set) => ({
   interestRateAnnual: DEFAULT_INTEREST_RATE_ANNUAL,
   searchResults: null,
   selectedPropertyId: null,
+  rentOverrides: {},
   setDownPaymentPercent: (downPaymentPercent) => set({ downPaymentPercent }),
   setInterestRateAnnual: (interestRateAnnual) => set({ interestRateAnnual }),
   setSearchResults: (searchResults) =>
-    set({ searchResults, selectedPropertyId: null }),
+    set({ searchResults, selectedPropertyId: null, rentOverrides: {} }),
   setSelectedPropertyId: (selectedPropertyId) => set({ selectedPropertyId }),
+  setRentOverride: (propertyId, monthlyRent) =>
+    set((state) => ({
+      rentOverrides: {
+        ...state.rentOverrides,
+        [propertyId]: monthlyRent,
+      },
+    })),
+  clearRentOverride: (propertyId) =>
+    set((state) => {
+      const next = { ...state.rentOverrides };
+      delete next[propertyId];
+      return { rentOverrides: next };
+    }),
 }));
 
 /** Convenience selectors for financing params used by the calculation engine. */

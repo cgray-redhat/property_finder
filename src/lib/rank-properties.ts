@@ -1,50 +1,56 @@
 import { runUnderwriting, type UnderwritingResult } from "@/lib/calculations";
+import {
+  resolveMonthlyRent,
+  type RentEstimate,
+} from "@/lib/rent-estimate";
 import type { EnrichedPropertyListing } from "@/types/property";
 
 export type RankedProperty = EnrichedPropertyListing & {
   estimatedMonthlyRent: number;
+  rentEstimate: RentEstimate;
   underwriting: UnderwritingResult;
 };
 
 type RankPropertiesOptions = {
   downPaymentPercent: number;
   interestRateAnnual: number;
+  rentOverrides?: Record<string, number>;
+  zipMedianRent?: number | null;
 };
 
 /**
  * Underwrite each listing and stack-rank by Cash-on-Cash return (descending).
- * Cap Rate is included in underwriting but CoC drives re-sort on What-If changes.
+ * Applies rental overrides and fallback estimates when API data is sparse.
  */
 export function rankProperties(
   properties: EnrichedPropertyListing[],
   options: RankPropertiesOptions,
 ): RankedProperty[] {
-  const ranked = properties
-    .map((property) => {
-      const estimatedMonthlyRent = property.rentalBenchmarks.medianRent;
+  const ranked = properties.map((property) => {
+    const rentEstimate = resolveMonthlyRent({
+      property,
+      rentOverride: options.rentOverrides?.[property.id],
+      zipMedianRent: options.zipMedianRent,
+    });
 
-      if (estimatedMonthlyRent == null || estimatedMonthlyRent <= 0) {
-        return null;
-      }
+    const underwriting = runUnderwriting({
+      property: {
+        purchasePrice: property.price,
+        monthlyRent: rentEstimate.monthlyRent,
+      },
+      financing: {
+        downPaymentPercent: options.downPaymentPercent,
+        interestRateAnnual: options.interestRateAnnual,
+      },
+    });
 
-      const underwriting = runUnderwriting({
-        property: {
-          purchasePrice: property.price,
-          monthlyRent: estimatedMonthlyRent,
-        },
-        financing: {
-          downPaymentPercent: options.downPaymentPercent,
-          interestRateAnnual: options.interestRateAnnual,
-        },
-      });
-
-      return {
-        ...property,
-        estimatedMonthlyRent,
-        underwriting,
-      };
-    })
-    .filter((property): property is RankedProperty => property !== null);
+    return {
+      ...property,
+      estimatedMonthlyRent: rentEstimate.monthlyRent,
+      rentEstimate,
+      underwriting,
+    };
+  });
 
   return ranked.sort(
     (a, b) => b.underwriting.cashOnCashReturn - a.underwriting.cashOnCashReturn,

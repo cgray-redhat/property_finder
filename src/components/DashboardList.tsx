@@ -4,8 +4,11 @@ import {
   capRateToneClasses,
   getCapRateTone,
 } from "@/lib/rank-properties";
+import { countSparseRentProperties, rentSourceLabel } from "@/lib/rent-estimate";
+import { trackEvent } from "@/lib/analytics";
 import { useRankedProperties } from "@/hooks/use-ranked-properties";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
+import { MarketRentErrorState } from "@/components/errors/MarketRentErrorState";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -39,6 +42,17 @@ export function DashboardList({ compact = false }: DashboardListProps) {
   );
   const rankedProperties = useRankedProperties();
 
+  function handlePropertyClick(propertyId: string, address: string, rank: number) {
+    setSelectedPropertyId(propertyId);
+    trackEvent("Property Listing Clicked", {
+      property_id: propertyId,
+      address,
+      rank: rank + 1,
+      zip_code: searchResults?.zipCode ?? null,
+      source: "list",
+    });
+  }
+
   if (!searchResults) {
     return (
       <section className="flex h-full items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
@@ -55,17 +69,31 @@ export function DashboardList({ compact = false }: DashboardListProps) {
     );
   }
 
+  const sparseCount = countSparseRentProperties(searchResults.properties);
+  const marketDataMissing = searchResults.marketSummary == null;
+  const showRentWarning = sparseCount > 0 || marketDataMissing;
+
   if (rankedProperties.length === 0) {
     return (
-      <section className="flex h-full items-center justify-center rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
-        <div>
-          <h3 className="text-lg font-semibold text-zinc-900">
-            No underwritable listings
-          </h3>
-          <p className="mt-2 text-sm text-zinc-600">
-            Listings in {searchResults.zipCode} are missing rental benchmark
-            data needed for ROI calculations.
-          </p>
+      <section className="flex h-full flex-col gap-4">
+        {showRentWarning && (
+          <MarketRentErrorState
+            zipCode={searchResults.zipCode}
+            sparseCount={sparseCount}
+            totalCount={searchResults.properties.length}
+            warnings={searchResults.meta.warnings}
+            marketDataMissing={marketDataMissing}
+          />
+        )}
+        <div className="flex flex-1 items-center justify-center rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
+          <div>
+            <h3 className="text-lg font-semibold text-zinc-900">
+              No listings to display
+            </h3>
+            <p className="mt-2 text-sm text-zinc-600">
+              No properties were returned for {searchResults.zipCode}.
+            </p>
+          </div>
         </div>
       </section>
     );
@@ -73,6 +101,16 @@ export function DashboardList({ compact = false }: DashboardListProps) {
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-3">
+      {showRentWarning && (
+        <MarketRentErrorState
+          zipCode={searchResults.zipCode}
+          sparseCount={sparseCount}
+          totalCount={searchResults.properties.length}
+          warnings={searchResults.meta.warnings}
+          marketDataMissing={marketDataMissing}
+        />
+      )}
+
       {!compact && (
         <div>
           <h3 className="text-lg font-semibold text-zinc-900">
@@ -106,7 +144,13 @@ export function DashboardList({ compact = false }: DashboardListProps) {
               return (
                 <tr
                   key={property.id}
-                  onClick={() => setSelectedPropertyId(property.id)}
+                  onClick={() =>
+                    handlePropertyClick(
+                      property.id,
+                      property.formattedAddress,
+                      index,
+                    )
+                  }
                   className={`cursor-pointer border-b border-zinc-100 transition-colors last:border-b-0 hover:bg-zinc-50 ${capRateToneClasses[tone]} ${isSelected ? "ring-2 ring-inset ring-emerald-500" : ""}`}
                 >
                   <td className="px-3 py-3 font-semibold text-zinc-900">
@@ -120,6 +164,11 @@ export function DashboardList({ compact = false }: DashboardListProps) {
                       {property.bedrooms ?? "—"} bd · {property.bathrooms ?? "—"}{" "}
                       ba
                     </p>
+                    {property.rentEstimate.isFallback && (
+                      <p className="mt-1 text-xs font-medium text-amber-700">
+                        Est. rent · {rentSourceLabel(property.rentEstimate.source)}
+                      </p>
+                    )}
                   </td>
                   <td className="px-3 py-3 tabular-nums text-zinc-900">
                     {formatCurrency(property.price)}

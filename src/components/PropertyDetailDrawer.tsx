@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { useSelectedRankedProperty } from "@/hooks/use-ranked-properties";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
 import {
   DEFAULT_MAINTENANCE_RATE,
   DEFAULT_VACANCY_RATE,
 } from "@/lib/calculations";
+import { rentSourceLabel } from "@/lib/rent-estimate";
+import { trackEvent } from "@/lib/analytics";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -51,13 +54,36 @@ export function PropertyDetailDrawer() {
   const setSelectedPropertyId = useInvestLocateStore(
     (state) => state.setSelectedPropertyId,
   );
+  const setRentOverride = useInvestLocateStore((state) => state.setRentOverride);
+  const clearRentOverride = useInvestLocateStore(
+    (state) => state.clearRentOverride,
+  );
+  const rentOverrides = useInvestLocateStore((state) => state.rentOverrides);
+  const [overrideInput, setOverrideInput] = useState("");
 
   if (!property) {
     return null;
   }
 
+  const propertyId = property.id;
+
+  function handleApplyOverride() {
+    const value = Number(overrideInput);
+    if (!Number.isFinite(value) || value <= 0) {
+      return;
+    }
+
+    setRentOverride(propertyId, value);
+    trackEvent("Property Listing Clicked", {
+      property_id: propertyId,
+      action: "rent_override_applied",
+      monthly_rent: value,
+    });
+  }
+
   const { underwriting } = property;
   const { operatingExpenses } = underwriting;
+  const hasOverride = propertyId in rentOverrides;
 
   return (
     <>
@@ -92,7 +118,64 @@ export function PropertyDetailDrawer() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
+          {property.rentEstimate.isFallback && (
+            <div
+              role="alert"
+              className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+            >
+              <p className="font-medium">Estimated rent in use</p>
+              <p className="mt-1">
+                Market rent data is sparse for this address. Current estimate
+                uses {rentSourceLabel(property.rentEstimate.source)}. Override
+                below if you have local knowledge.
+              </p>
+            </div>
+          )}
+
           <section>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              Rental override
+            </h3>
+            <div className="mt-2 rounded-xl border border-zinc-200 p-4">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-zinc-700">
+                  Monthly rent override
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  step={50}
+                  placeholder={String(property.estimatedMonthlyRent)}
+                  value={overrideInput}
+                  onChange={(event) => setOverrideInput(event.target.value)}
+                  className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
+                />
+              </label>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplyOverride}
+                  className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+                >
+                  Apply override
+                </button>
+                {hasOverride && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearRentOverride(propertyId);
+                      setOverrideInput("");
+                    }}
+                    className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
               Income
             </h3>
@@ -100,7 +183,7 @@ export function PropertyDetailDrawer() {
               <LineItem
                 label="Estimated monthly rent"
                 value={`${formatCurrency(property.estimatedMonthlyRent)}/mo`}
-                detail="Zip-level RentCast benchmark"
+                detail={rentSourceLabel(property.rentEstimate.source)}
               />
               <LineItem
                 label="Gross annual rent"

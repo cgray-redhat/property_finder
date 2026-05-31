@@ -4,6 +4,7 @@ import {
   DEFAULT_DOWN_PAYMENT_PERCENT,
   DEFAULT_INTEREST_RATE_ANNUAL,
 } from "@/lib/calculations";
+import { trackEvent } from "@/lib/analytics";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
 
 const DOWN_PAYMENT_MIN = 0.05;
@@ -74,6 +75,22 @@ export function WhatIfSidebar() {
     (state) => state.setInterestRateAnnual,
   );
 
+  function handleDownPaymentChange(value: number) {
+    setDownPaymentPercent(value);
+    trackEvent("What-If Slider Adjusted", {
+      parameter: "down_payment_percent",
+      value: Math.round(value * 100),
+    });
+  }
+
+  function handleInterestRateChange(value: number) {
+    setInterestRateAnnual(value);
+    trackEvent("What-If Slider Adjusted", {
+      parameter: "interest_rate_percent",
+      value: Number((value * 100).toFixed(2)),
+    });
+  }
+
   return (
     <aside className="sticky top-6 h-fit w-full shrink-0 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm lg:w-72">
       <div className="flex flex-col gap-1">
@@ -98,7 +115,7 @@ export function WhatIfSidebar() {
           max={DOWN_PAYMENT_MAX}
           step={0.01}
           displayValue={formatPercent(downPaymentPercent, 0)}
-          onChange={setDownPaymentPercent}
+          onChange={handleDownPaymentChange}
         />
 
         <SliderField
@@ -109,7 +126,7 @@ export function WhatIfSidebar() {
           max={INTEREST_RATE_MAX}
           step={0.001}
           displayValue={formatPercent(interestRateAnnual)}
-          onChange={setInterestRateAnnual}
+          onChange={handleInterestRateChange}
         />
 
         <div className="grid grid-cols-2 gap-3">
@@ -122,7 +139,7 @@ export function WhatIfSidebar() {
               step={1}
               value={Math.round(downPaymentPercent * 100)}
               onChange={(event) =>
-                setDownPaymentPercent(Number(event.target.value) / 100)
+                handleDownPaymentChange(Number(event.target.value) / 100)
               }
               className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
             />
@@ -137,7 +154,7 @@ export function WhatIfSidebar() {
               step={0.1}
               value={Number((interestRateAnnual * 100).toFixed(2))}
               onChange={(event) =>
-                setInterestRateAnnual(Number(event.target.value) / 100)
+                handleInterestRateChange(Number(event.target.value) / 100)
               }
               className="rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900"
             />
@@ -150,6 +167,10 @@ export function WhatIfSidebar() {
         onClick={() => {
           setDownPaymentPercent(DEFAULT_DOWN_PAYMENT_PERCENT);
           setInterestRateAnnual(DEFAULT_INTEREST_RATE_ANNUAL);
+          trackEvent("What-If Slider Adjusted", {
+            parameter: "reset_defaults",
+            value: 1,
+          });
         }}
         className="mt-6 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
       >
