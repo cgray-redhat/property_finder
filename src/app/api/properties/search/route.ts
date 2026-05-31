@@ -4,9 +4,13 @@ import {
   enrichListingsWithMarketData,
 } from "@/lib/rentcast/enrich";
 import {
-  fetchRentCastMarketData,
-  fetchRentCastSaleListings,
-} from "@/lib/rentcast/client";
+  getCachedListings,
+  getCachedMarketData,
+} from "@/lib/rentcast/cached-fetch";
+import {
+  LISTINGS_CACHE_TTL_MS,
+  LISTINGS_MAX_RESULTS,
+} from "@/lib/rentcast/cache-policy";
 import {
   createEmptySearchResponse,
   type PropertySearchErrorCode,
@@ -44,10 +48,12 @@ function errorStatus(code: PropertySearchErrorCode): number {
 }
 
 function jsonResponse(body: PropertySearchResponse, status = 200) {
+  const maxAgeSeconds = Math.floor(LISTINGS_CACHE_TTL_MS / 1000);
+
   return NextResponse.json(body, {
     status,
     headers: {
-      "Cache-Control": "no-store",
+      "Cache-Control": `public, s-maxage=${maxAgeSeconds}, stale-while-revalidate=${maxAgeSeconds * 2}`,
       "X-Data-Last-Updated": body.lastUpdated,
     },
   });
@@ -55,12 +61,15 @@ function jsonResponse(body: PropertySearchResponse, status = 200) {
 
 /**
  * GET /api/properties/search?zipCode=78723
+ * GET /api/properties/search?zipCode=78723&loadAll=true
  *
  * Fetches active for-sale listings and zip-level rental market benchmarks
- * from RentCast, then returns a blended standardized JSON payload.
+ * from RentCast (with server-side TTL caching), then returns a blended payload.
  */
 export async function GET(request: Request) {
-  const zipCode = resolveZipCode(new URL(request.url).searchParams);
+  const searchParams = new URL(request.url).searchParams;
+  const zipCode = resolveZipCode(searchParams);
+  const loadAll = searchParams.get("loadAll") === "true";
 
   if (!zipCode) {
     return jsonResponse(
@@ -85,8 +94,8 @@ export async function GET(request: Request) {
 
   try {
     const [listingsResult, marketResult] = await Promise.all([
-      fetchRentCastSaleListings(zipCode),
-      fetchRentCastMarketData(zipCode),
+      getCachedListings(zipCode, loadAll),
+      getCachedMarketData(zipCode),
     ]);
 
     if (!listingsResult.ok) {
@@ -128,19 +137,28 @@ export async function GET(request: Request) {
       marketData = marketResult.data;
     }
 
-    const lastUpdated = new Date().toISOString();
-    const listings = Array.isArray(listingsResult.data)
-      ? listingsResult.data
-      : [];
+    const { listings, scope, hasMoreListings, fetchedAt } = listingsResult.data;
 
     if (listings.length === 0) {
       warnings.push("No active listings returned for this zip code.");
     }
 
+    if (loadAll && listings.length >= LISTINGS_MAX_RESULTS) {
+      warnings.push(
+        "Listing results were capped at 5,000 records. Some MLS listings may not be included.",
+      );
+    }
+
+    if (!loadAll && hasMoreListings) {
+      warnings.push(
+        `Showing the first ${listings.length} listings. Use "Load all listings" to fetch the rest.`,
+      );
+    }
+
     const properties = enrichListingsWithMarketData(
       listings,
       marketData,
-      lastUpdated,
+      fetchedAt,
     );
 
     const response = buildSearchResponse(
@@ -148,6 +166,7 @@ export async function GET(request: Request) {
       properties,
       marketData,
       warnings,
+      { listingsScope: scope, hasMoreListings: loadAll ? false : hasMoreListings },
     );
 
     return jsonResponse(response);

@@ -2,8 +2,19 @@ import type {
   RentCastMarketData,
   RentCastSaleListing,
 } from "@/types/property";
+import {
+  LISTINGS_MAX_RESULTS,
+  LISTINGS_PAGE_SIZE,
+} from "@/lib/rentcast/cache-policy";
+
+export { LISTINGS_PAGE_SIZE, LISTINGS_MAX_RESULTS };
 
 const RENTCAST_BASE_URL = "https://api.rentcast.io/v1";
+
+export type FetchListingsOptions = {
+  /** When false (default), only the first page (500) is fetched. */
+  loadAll?: boolean;
+};
 
 export type RentCastFetchResult<T> =
   | { ok: true; data: T; status: number }
@@ -71,7 +82,9 @@ async function rentCastFetch<T>(
 
 export async function fetchRentCastSaleListings(
   zipCode: string,
+  options: FetchListingsOptions = {},
 ): Promise<RentCastFetchResult<RentCastSaleListing[]>> {
+  const { loadAll = false } = options;
   const apiKey = getApiKey();
 
   if (!apiKey) {
@@ -83,16 +96,43 @@ export async function fetchRentCastSaleListings(
     };
   }
 
-  const params = new URLSearchParams({
-    zipCode,
-    status: "Active",
-    limit: "20",
-  });
+  const allListings: RentCastSaleListing[] = [];
+  let offset = 0;
 
-  return rentCastFetch<RentCastSaleListing[]>(
-    `/listings/sale?${params.toString()}`,
-    apiKey,
-  );
+  do {
+    const params = new URLSearchParams({
+      zipCode,
+      status: "Active",
+      limit: String(LISTINGS_PAGE_SIZE),
+      offset: String(offset),
+    });
+
+    const pageResult = await rentCastFetch<RentCastSaleListing[]>(
+      `/listings/sale?${params.toString()}`,
+      apiKey,
+    );
+
+    if (!pageResult.ok) {
+      return offset === 0
+        ? pageResult
+        : {
+            ok: true,
+            data: allListings,
+            status: pageResult.status,
+          };
+    }
+
+    const page = Array.isArray(pageResult.data) ? pageResult.data : [];
+    allListings.push(...page);
+
+    if (page.length < LISTINGS_PAGE_SIZE) {
+      break;
+    }
+
+    offset += LISTINGS_PAGE_SIZE;
+  } while (loadAll && offset < LISTINGS_MAX_RESULTS);
+
+  return { ok: true, data: allListings, status: 200 };
 }
 
 export async function fetchRentCastMarketData(

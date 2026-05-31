@@ -6,6 +6,7 @@ import type {
   RentCastSaleListing,
   RentalBenchmarks,
 } from "@/types/property";
+import { filterForAppMode } from "@/lib/property-classification";
 
 function pickRentalBenchmarks(
   bedrooms: number | null | undefined,
@@ -93,8 +94,17 @@ export function buildSearchResponse(
   listings: EnrichedPropertyListing[],
   marketData: RentCastMarketData | null,
   warnings: string[],
+  options: {
+    listingsScope?: "first_page" | "all";
+    hasMoreListings?: boolean;
+  } = {},
 ): PropertySearchResponse {
   const lastUpdated = new Date().toISOString();
+  const listingsScope = options.listingsScope ?? "first_page";
+  const hasMoreListings = options.hasMoreListings ?? false;
+
+  const propertyCount = filterForAppMode(listings, "property_finder").length;
+  const lotCount = filterForAppMode(listings, "lot_finder").length;
 
   return {
     success: true,
@@ -105,6 +115,10 @@ export function buildSearchResponse(
     meta: {
       zipCode,
       listingCount: listings.length,
+      propertyCount,
+      lotCount,
+      listingsScope,
+      hasMoreListings,
       dataSource: "rentcast",
       partial: warnings.length > 0,
       warnings,

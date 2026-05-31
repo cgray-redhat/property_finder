@@ -1,23 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  PROPERTY_SEARCH_API,
+  buildSearchUrl,
+  LISTINGS_PAGE_SIZE,
   type PropertySearchQuery,
   type PropertySearchResponse,
 } from "@/lib/api/search";
+import { isCachedSearchFresh } from "@/lib/search-freshness";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
-
-function buildSearchUrl(query: PropertySearchQuery): string {
-  const params = new URLSearchParams();
-  const zipCode = query.zipCode?.trim() || query.zip?.trim() || query.location?.trim();
-
-  if (zipCode) {
-    params.set("zipCode", zipCode);
-  }
-
-  return `${PROPERTY_SEARCH_API}?${params.toString()}`;
-}
 
 const inputClassName =
   "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20";
@@ -25,13 +16,38 @@ const inputClassName =
 export function PropertySearchPanel() {
   const [zipCode, setZipCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const setSearchResults = useInvestLocateStore((state) => state.setSearchResults);
   const searchResults = useInvestLocateStore((state) => state.searchResults);
 
+  useEffect(() => {
+    if (searchResults?.zipCode) {
+      setZipCode(searchResults.zipCode);
+    }
+  }, [searchResults?.zipCode]);
+
+  async function runSearch(query: PropertySearchQuery) {
+    const trimmedZip =
+      query.zipCode?.trim() || query.zip?.trim() || query.location?.trim() || "";
+
+    setError(null);
+    setCacheNotice(null);
+
+    const response = await fetch(buildSearchUrl(query));
+    const data = (await response.json()) as PropertySearchResponse;
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error?.message ?? "Search failed");
+    }
+
+    setSearchResults(data);
+    return data;
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
 
     if (!zipCode.trim()) {
       setError("Enter a 5-digit zip code.");
@@ -43,17 +59,17 @@ export function PropertySearchPanel() {
       return;
     }
 
+    if (isCachedSearchFresh(searchResults, zipCode.trim())) {
+      setCacheNotice(
+        `Using cached results for ${zipCode.trim()} (refreshes every 30 minutes).`,
+      );
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const response = await fetch(buildSearchUrl({ zipCode }));
-      const data = (await response.json()) as PropertySearchResponse;
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error?.message ?? "Search failed");
-      }
-
-      setSearchResults(data);
+      await runSearch({ zipCode: zipCode.trim(), loadAll: false });
     } catch (err) {
       setSearchResults(null);
       setError(err instanceof Error ? err.message : "Search failed");
@@ -62,16 +78,50 @@ export function PropertySearchPanel() {
     }
   }
 
+  async function handleLoadAll() {
+    if (!searchResults?.zipCode) {
+      return;
+    }
+
+    if (
+      isCachedSearchFresh(searchResults, searchResults.zipCode, {
+        requireAllListings: true,
+      })
+    ) {
+      setCacheNotice("All listings for this zip are already loaded.");
+      return;
+    }
+
+    setIsLoadingAll(true);
+    setError(null);
+    setCacheNotice(null);
+
+    try {
+      await runSearch({ zipCode: searchResults.zipCode, loadAll: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load all listings");
+    } finally {
+      setIsLoadingAll(false);
+    }
+  }
+
+  const showLoadAll =
+    searchResults?.success &&
+    searchResults.meta.hasMoreListings &&
+    searchResults.meta.listingsScope === "first_page";
+
   return (
     <form
       onSubmit={handleSubmit}
       className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
     >
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-zinc-900">Search properties</h2>
+        <h2 className="text-lg font-semibold text-zinc-900">Search by zip code</h2>
         <p className="text-sm text-zinc-600">
-          Enter a US zip code to load active listings and stack-rank them by
-          investment returns.
+          One search loads up to {LISTINGS_PAGE_SIZE.toLocaleString()} active MLS
+          listings from RentCast. Property Finder and Lot Finder share the same
+          results — switch tabs without searching again. Repeat searches within
+          30 minutes use cached data.
         </p>
       </div>
 
@@ -91,12 +141,45 @@ export function PropertySearchPanel() {
 
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || isLoadingAll}
           className="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 sm:mb-0.5"
         >
           {isLoading ? "Searching…" : "Search listings"}
         </button>
       </div>
+
+      {searchResults?.success && (
+        <div className="mt-4 flex flex-col gap-3">
+          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            Loaded {searchResults.meta.listingCount} listing
+            {searchResults.meta.listingCount === 1 ? "" : "s"} for{" "}
+            {searchResults.zipCode}: {searchResults.meta.propertyCount} rental
+            propert{searchResults.meta.propertyCount === 1 ? "y" : "ies"} and{" "}
+            {searchResults.meta.lotCount} lot
+            {searchResults.meta.lotCount === 1 ? "" : "s"}.
+            {searchResults.meta.listingsScope === "first_page" &&
+              searchResults.meta.hasMoreListings &&
+              " More listings may be available."}
+          </p>
+
+          {showLoadAll && (
+            <button
+              type="button"
+              onClick={handleLoadAll}
+              disabled={isLoadingAll || isLoading}
+              className="w-fit rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-900 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoadingAll ? "Loading all listings…" : "Load all listings"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {cacheNotice && (
+        <p className="mt-4 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          {cacheNotice}
+        </p>
+      )}
 
       {error && (
         <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

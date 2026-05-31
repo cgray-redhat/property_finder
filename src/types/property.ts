@@ -111,6 +111,14 @@ export type PropertySearchError = {
 export type PropertySearchMeta = {
   zipCode: string;
   listingCount: number;
+  /** Homes and rentals included in Property Finder. */
+  propertyCount: number;
+  /** Land and vacant lots included in Lot Finder. */
+  lotCount: number;
+  /** Whether the first page only or full pagination was loaded. */
+  listingsScope: "first_page" | "all";
+  /** True when more listings may exist beyond the first page. */
+  hasMoreListings: boolean;
   dataSource: "rentcast";
   partial: boolean;
   warnings: string[];
@@ -154,6 +162,10 @@ export function createEmptySearchResponse(
     meta: {
       zipCode,
       listingCount: 0,
+      propertyCount: 0,
+      lotCount: 0,
+      listingsScope: "first_page",
+      hasMoreListings: false,
       dataSource: "rentcast",
       partial: false,
       warnings: [],

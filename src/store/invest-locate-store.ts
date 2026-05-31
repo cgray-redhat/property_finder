@@ -36,7 +36,14 @@ export const useInvestLocateStore = create<InvestLocateState>((set) => ({
   setDownPaymentPercent: (downPaymentPercent) => set({ downPaymentPercent }),
   setInterestRateAnnual: (interestRateAnnual) => set({ interestRateAnnual }),
   setSearchResults: (searchResults) =>
-    set({ searchResults, selectedPropertyId: null, rentOverrides: {} }),
+    set((state) => ({
+      searchResults,
+      selectedPropertyId: null,
+      rentOverrides:
+        state.searchResults?.zipCode === searchResults?.zipCode
+          ? state.rentOverrides
+          : {},
+    })),
   setSelectedPropertyId: (selectedPropertyId) => set({ selectedPropertyId }),
   setRentOverride: (propertyId, monthlyRent) =>
     set((state) => ({

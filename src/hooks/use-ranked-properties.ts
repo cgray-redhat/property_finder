@@ -14,7 +14,6 @@ export function useAppMode(): AppMode {
 
 export function useRankedProperties(): RankedProperty[] {
   const searchResults = useInvestLocateStore((state) => state.searchResults);
-  const appMode = useInvestLocateStore((state) => state.appMode);
   const downPaymentPercent = useInvestLocateStore(
     (state) => state.downPaymentPercent,
   );
@@ -24,7 +23,7 @@ export function useRankedProperties(): RankedProperty[] {
   const rentOverrides = useInvestLocateStore((state) => state.rentOverrides);
 
   return useMemo(() => {
-    if (!searchResults || appMode !== "property_finder") {
+    if (!searchResults) {
       return [];
     }
 
@@ -41,7 +40,6 @@ export function useRankedProperties(): RankedProperty[] {
     });
   }, [
     searchResults,
-    appMode,
     downPaymentPercent,
     interestRateAnnual,
     rentOverrides,
@@ -50,16 +48,37 @@ export function useRankedProperties(): RankedProperty[] {
 
 export function useLotListings(): EnrichedPropertyListing[] {
   const searchResults = useInvestLocateStore((state) => state.searchResults);
-  const appMode = useInvestLocateStore((state) => state.appMode);
 
   return useMemo(() => {
-    if (!searchResults || appMode !== "lot_finder") {
+    if (!searchResults) {
       return [];
     }
 
     const lots = filterForAppMode(searchResults.properties, "lot_finder");
     return rankLotListings(lots);
-  }, [searchResults, appMode]);
+  }, [searchResults]);
+}
+
+export function useSearchListingCounts(): {
+  total: number;
+  propertyCount: number;
+  lotCount: number;
+  zipCode: string;
+} | null {
+  const searchResults = useInvestLocateStore((state) => state.searchResults);
+
+  return useMemo(() => {
+    if (!searchResults) {
+      return null;
+    }
+
+    return {
+      total: searchResults.meta.listingCount,
+      propertyCount: searchResults.meta.propertyCount,
+      lotCount: searchResults.meta.lotCount,
+      zipCode: searchResults.zipCode,
+    };
+  }, [searchResults]);
 }
 
 export function useSelectedRankedProperty(): RankedProperty | null {

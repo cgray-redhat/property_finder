@@ -1,25 +1,34 @@
 "use client";
 
 import type { AppMode } from "@/lib/property-classification";
-import { useAppMode } from "@/hooks/use-ranked-properties";
+import { useAppMode, useSearchListingCounts } from "@/hooks/use-ranked-properties";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
 
 const tabs: { mode: AppMode; label: string; description: string }[] = [
   {
     mode: "property_finder",
     label: "Property Finder",
-    description: "Rental investments — excludes land and vacant lots",
+    description: "Rental investments from the same zip search — excludes land and vacant lots",
   },
   {
     mode: "lot_finder",
     label: "Lot Finder",
-    description: "Land and vacant lots only",
+    description: "Land and vacant lots from the same zip search",
   },
 ];
+
+function formatTabLabel(label: string, count: number | null): string {
+  if (count == null) {
+    return label;
+  }
+
+  return `${label} (${count})`;
+}
 
 export function AppModeTabs() {
   const appMode = useAppMode();
   const setAppMode = useInvestLocateStore((state) => state.setAppMode);
+  const counts = useSearchListingCounts();
   const activeTab = tabs.find((tab) => tab.mode === appMode) ?? tabs[0];
 
   return (
@@ -31,6 +40,10 @@ export function AppModeTabs() {
       >
         {tabs.map((tab) => {
           const isActive = tab.mode === appMode;
+          const count =
+            tab.mode === "property_finder"
+              ? counts?.propertyCount ?? null
+              : counts?.lotCount ?? null;
 
           return (
             <button
@@ -45,12 +58,16 @@ export function AppModeTabs() {
                   : "text-zinc-600 hover:text-zinc-900"
               }`}
             >
-              {tab.label}
+              {formatTabLabel(tab.label, count)}
             </button>
           );
         })}
       </div>
-      <p className="text-sm text-zinc-600">{activeTab.description}</p>
+      <p className="text-sm text-zinc-600">
+        {counts
+          ? `${counts.total} MLS listing${counts.total === 1 ? "" : "s"} loaded for ${counts.zipCode}. ${activeTab.description}.`
+          : activeTab.description}
+      </p>
     </div>
   );
 }
