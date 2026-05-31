@@ -1,11 +1,18 @@
+"use client";
+
 import {
   AppHeader,
   DashboardList,
   PropertySearchPanel,
   WhatIfSidebar,
 } from "@/components";
+import { AppModeTabs } from "@/components/layout/app-mode-tabs";
+import { useAppMode } from "@/hooks/use-ranked-properties";
 
 export default function Home() {
+  const appMode = useAppMode();
+  const isLotMode = appMode === "lot_finder";
+
   return (
     <>
       <AppHeader />
@@ -15,18 +22,19 @@ export default function Home() {
             Real estate cash-flow analysis
           </h2>
           <p className="mt-3 max-w-2xl text-zinc-600">
-            Property Finder (internal code: InvestLocate) helps investors
-            discover active listings, run cash-flow scenarios, and build
-            shortlists for comparison.
+            Property Finder analyzes rental investments. Lot Finder surfaces
+            vacant land and parcels without bed/bath data.
           </p>
         </section>
+
+        <AppModeTabs />
 
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
           <div className="flex min-w-0 flex-1 flex-col gap-6">
             <PropertySearchPanel />
             <DashboardList />
           </div>
-          <WhatIfSidebar />
+          {!isLotMode && <WhatIfSidebar />}
         </div>
       </main>
     </>

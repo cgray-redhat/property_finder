@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useSelectedRankedProperty } from "@/hooks/use-ranked-properties";
+import {
+  useAppMode,
+  useSelectedLotListing,
+  useSelectedRankedProperty,
+} from "@/hooks/use-ranked-properties";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
 import {
   DEFAULT_MAINTENANCE_RATE,
@@ -50,6 +54,8 @@ function LineItem({ label, value, detail, emphasis }: LineItemProps) {
 }
 
 export function PropertyDetailDrawer() {
+  const appMode = useAppMode();
+  const lot = useSelectedLotListing();
   const property = useSelectedRankedProperty();
   const setSelectedPropertyId = useInvestLocateStore(
     (state) => state.setSelectedPropertyId,
@@ -60,6 +66,84 @@ export function PropertyDetailDrawer() {
   );
   const rentOverrides = useInvestLocateStore((state) => state.rentOverrides);
   const [overrideInput, setOverrideInput] = useState("");
+
+  if (appMode === "lot_finder") {
+    if (!lot) {
+      return null;
+    }
+
+    return (
+      <>
+        <button
+          type="button"
+          aria-label="Close property details"
+          className="fixed inset-0 z-40 bg-black/30"
+          onClick={() => setSelectedPropertyId(null)}
+        />
+
+        <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-zinc-200 bg-white shadow-2xl">
+          <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-6 py-5">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-widest text-indigo-700">
+                Lot Finder
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-zinc-900">
+                {lot.formattedAddress}
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600">
+                {lot.propertyType ?? "Land / Lot"} · {formatCurrency(lot.price)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedPropertyId(null)}
+              className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <section className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-950">
+              <p className="font-medium">Land listing</p>
+              <p className="mt-1">
+                Rental cash-flow metrics are not applied to vacant lots. Use
+                Property Finder for income-producing homes and rentals.
+              </p>
+            </section>
+
+            <section className="mt-6">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                Parcel details
+              </h3>
+              <div className="mt-2 divide-y divide-zinc-100 rounded-xl border border-zinc-200 px-4">
+                <LineItem label="List price" value={formatCurrency(lot.price)} emphasis />
+                <LineItem
+                  label="Square footage"
+                  value={
+                    lot.squareFootage
+                      ? lot.squareFootage.toLocaleString()
+                      : "Not listed"
+                  }
+                />
+                <LineItem
+                  label="Bedrooms / baths"
+                  value={`${lot.bedrooms ?? 0} bd · ${lot.bathrooms ?? 0} ba`}
+                  detail="Identified as land — no residential bed/bath count"
+                />
+                <LineItem
+                  label="Days on market"
+                  value={
+                    lot.daysOnMarket != null ? String(lot.daysOnMarket) : "—"
+                  }
+                />
+              </div>
+            </section>
+          </div>
+        </aside>
+      </>
+    );
+  }
 
   if (!property) {
     return null;

@@ -5,16 +5,41 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { getCapRateColor } from "@/lib/rank-properties";
 import { trackEvent } from "@/lib/analytics";
-import { useRankedProperties } from "@/hooks/use-ranked-properties";
+import {
+  useAppMode,
+  useLotListings,
+  useRankedProperties,
+} from "@/hooks/use-ranked-properties";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
+import type { EnrichedPropertyListing } from "@/types/property";
+import type { RankedProperty } from "@/lib/rank-properties";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+const LOT_PIN_COLOR = "#6366f1";
+
+type MappableListing = EnrichedPropertyListing | RankedProperty;
+
+function getPinColor(listing: MappableListing, isLotMode: boolean): string {
+  if (isLotMode) {
+    return LOT_PIN_COLOR;
+  }
+
+  return getCapRateColor(
+    (listing as RankedProperty).underwriting.capRate,
+  );
+}
 
 export function DealMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const appMode = useAppMode();
+  const isLotMode = appMode === "lot_finder";
   const rankedProperties = useRankedProperties();
+  const lotListings = useLotListings();
+  const mapListings: MappableListing[] = isLotMode
+    ? lotListings
+    : rankedProperties;
   const selectedPropertyId = useInvestLocateStore(
     (state) => state.selectedPropertyId,
   );
@@ -23,7 +48,7 @@ export function DealMap() {
   );
   const searchResults = useInvestLocateStore((state) => state.searchResults);
 
-  const mappableCount = rankedProperties.filter(
+  const mappableCount = mapListings.filter(
     (property) => property.latitude != null && property.longitude != null,
   ).length;
 
@@ -61,7 +86,7 @@ export function DealMap() {
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
-    const mappable = rankedProperties.filter(
+    const mappable = mapListings.filter(
       (property) => property.latitude != null && property.longitude != null,
     );
 
@@ -77,7 +102,7 @@ export function DealMap() {
         continue;
       }
 
-      const color = getCapRateColor(property.underwriting.capRate);
+      const color = getPinColor(property, isLotMode);
       const isSelected = property.id === selectedPropertyId;
       const size = isSelected ? 18 : 14;
 
@@ -102,6 +127,7 @@ export function DealMap() {
           rank: index + 1,
           zip_code: searchResults?.zipCode ?? null,
           source: "map",
+          mode: appMode,
         });
       });
 
@@ -114,7 +140,14 @@ export function DealMap() {
     }
 
     map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 });
-  }, [rankedProperties, selectedPropertyId, setSelectedPropertyId, searchResults]);
+  }, [
+    mapListings,
+    isLotMode,
+    selectedPropertyId,
+    setSelectedPropertyId,
+    searchResults,
+    appMode,
+  ]);
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -138,7 +171,7 @@ export function DealMap() {
       {mappableCount === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/70 p-6 text-center">
           <p className="text-sm text-zinc-600">
-            Search a zip code to plot active listings on the map.
+            Search a zip code to plot {isLotMode ? "land listings" : "rental properties"} on the map.
           </p>
         </div>
       )}

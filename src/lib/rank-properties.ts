@@ -1,3 +1,4 @@
+import { isLotListing } from "@/lib/property-classification";
 import { runUnderwriting, type UnderwritingResult } from "@/lib/calculations";
 import {
   resolveMonthlyRent,
@@ -26,7 +27,9 @@ export function rankProperties(
   properties: EnrichedPropertyListing[],
   options: RankPropertiesOptions,
 ): RankedProperty[] {
-  const ranked = properties.map((property) => {
+  const ranked = properties
+    .filter((property) => !isLotListing(property))
+    .map((property) => {
     const rentEstimate = resolveMonthlyRent({
       property,
       rentOverride: options.rentOverrides?.[property.id],
