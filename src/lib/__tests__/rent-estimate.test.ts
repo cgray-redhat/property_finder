@@ -4,6 +4,7 @@ import type { EnrichedPropertyListing } from "@/types/property";
 const baseProperty: EnrichedPropertyListing = {
   id: "test-1",
   formattedAddress: "123 Main St",
+  addressLine1: "123 Main St",
   city: "Austin",
   state: "TX",
   zipCode: "78723",
@@ -16,6 +17,11 @@ const baseProperty: EnrichedPropertyListing = {
   propertyType: "Single Family",
   listedDate: null,
   daysOnMarket: null,
+  mlsNumber: null,
+  lotSizeSqFt: null,
+  viewType: null,
+  legalDescription: null,
+  zoning: null,
   rentalBenchmarks: {
     medianRent: 2500,
     averageRent: 2400,

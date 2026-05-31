@@ -13,6 +13,9 @@ import {
   useRankedProperties,
 } from "@/hooks/use-ranked-properties";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
+import { formatLotSize } from "@/lib/lot-attributes";
+import { LotExternalLinks } from "@/components/lot/LotExternalLinks";
+import { LotWaterBadges } from "@/components/lot/LotWaterBadges";
 import { MarketRentErrorState } from "@/components/errors/MarketRentErrorState";
 
 function formatCurrency(value: number): string {
@@ -117,7 +120,8 @@ export function DashboardList({ compact = false }: DashboardListProps) {
                 <th className="px-3 py-3 font-medium">Property</th>
                 <th className="px-3 py-3 font-medium">Type</th>
                 <th className="px-3 py-3 font-medium">Price</th>
-                <th className="hidden px-3 py-3 font-medium sm:table-cell">Sqft</th>
+                <th className="hidden px-3 py-3 font-medium md:table-cell">Lot size</th>
+                <th className="hidden px-3 py-3 font-medium lg:table-cell">Water</th>
               </tr>
             </thead>
             <tbody>
@@ -139,6 +143,12 @@ export function DashboardList({ compact = false }: DashboardListProps) {
                       <p className="font-medium text-zinc-900">
                         {lot.formattedAddress}
                       </p>
+                      <div className="mt-1.5">
+                        <LotExternalLinks lot={lot} compact />
+                      </div>
+                      <div className="mt-1 lg:hidden">
+                        <LotWaterBadges lot={lot} compact />
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-zinc-700">
                       {lot.propertyType ?? "Land / Lot"}
@@ -146,10 +156,11 @@ export function DashboardList({ compact = false }: DashboardListProps) {
                     <td className="px-3 py-3 font-medium tabular-nums text-zinc-900">
                       {formatCurrency(lot.price)}
                     </td>
-                    <td className="hidden px-3 py-3 tabular-nums text-zinc-700 sm:table-cell">
-                      {lot.squareFootage
-                        ? lot.squareFootage.toLocaleString()
-                        : "—"}
+                    <td className="hidden px-3 py-3 tabular-nums text-zinc-700 md:table-cell">
+                      {formatLotSize(lot.lotSizeSqFt)}
+                    </td>
+                    <td className="hidden px-3 py-3 lg:table-cell">
+                      <LotWaterBadges lot={lot} compact />
                     </td>
                   </tr>
                 );

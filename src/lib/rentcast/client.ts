@@ -1,13 +1,21 @@
-import type { RentCastMarketData, RentCastSaleListing } from "@/types/property";
+import type {
+  RentCastMarketData,
+  RentCastPropertyRecord,
+  RentCastSaleListing,
+} from "@/types/property";
 import {
   LISTINGS_MAX_RESULTS,
   LISTINGS_PAGE_SIZE,
 } from "@/lib/rentcast/cache-policy";
 import type { RentCastListingQuery } from "@/lib/rentcast/listing-filters";
 
+export type { RentCastPropertyRecord };
+
 export type RentCastFetchResult<T> =
   | { ok: true; data: T; status: number }
   | { ok: false; status: number; code: string; message: string };
+
+export type CachedPropertyRecord = RentCastPropertyRecord | "missing";
 
 export type FetchListingsOptions = {
   /** When false (default), only the first page (500) is fetched. */
@@ -171,6 +179,49 @@ export async function fetchRentCastMarketData(
     `/markets?${params.toString()}`,
     apiKey,
   );
+}
+
+export async function fetchRentCastPropertyRecord(
+  formattedAddress: string,
+): Promise<RentCastFetchResult<RentCastPropertyRecord>> {
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    return {
+      ok: false,
+      status: 503,
+      code: "MISSING_API_KEY",
+      message: "RENTCAST_API_KEY is not configured on the server.",
+    };
+  }
+
+  const params = new URLSearchParams({
+    address: formattedAddress,
+    limit: "1",
+  });
+
+  const result = await rentCastFetch<RentCastPropertyRecord[]>(
+    `/properties?${params.toString()}`,
+    apiKey,
+  );
+
+  if (!result.ok) {
+    return result;
+  }
+
+  const records = Array.isArray(result.data) ? result.data : [];
+  const record = records[0];
+
+  if (!record) {
+    return {
+      ok: false,
+      status: 404,
+      code: "RENTCAST_ERROR",
+      message: "No property record found for this address.",
+    };
+  }
+
+  return { ok: true, data: record, status: result.status };
 }
 
 export function isRentCastConfigured(): boolean {

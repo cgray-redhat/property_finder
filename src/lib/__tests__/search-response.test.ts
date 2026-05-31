@@ -6,6 +6,7 @@ describe("buildSearchResponse", () => {
     const rental: EnrichedPropertyListing = {
       id: "home-1",
       formattedAddress: "123 Oak St",
+      addressLine1: "123 Oak St",
       city: "Austin",
       state: "TX",
       zipCode: "78723",
@@ -18,6 +19,11 @@ describe("buildSearchResponse", () => {
       propertyType: "Single Family",
       listedDate: null,
       daysOnMarket: 10,
+      mlsNumber: null,
+      lotSizeSqFt: null,
+      viewType: null,
+      legalDescription: null,
+      zoning: null,
       rentalBenchmarks: {
         medianRent: 2200,
         averageRent: 2100,

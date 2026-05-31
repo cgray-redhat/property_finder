@@ -12,6 +12,9 @@ import {
   DEFAULT_VACANCY_RATE,
 } from "@/lib/calculations";
 import { rentSourceLabel } from "@/lib/rent-estimate";
+import { formatLotSize, hasWaterFeature } from "@/lib/lot-attributes";
+import { LotExternalLinks } from "@/components/lot/LotExternalLinks";
+import { LotWaterBadges } from "@/components/lot/LotWaterBadges";
 import { trackEvent } from "@/lib/analytics";
 
 function formatCurrency(value: number): string {
@@ -93,6 +96,9 @@ export function PropertyDetailDrawer() {
               <p className="mt-1 text-sm text-zinc-600">
                 {lot.propertyType ?? "Land / Lot"} · {formatCurrency(lot.price)}
               </p>
+              <div className="mt-3">
+                <LotExternalLinks lot={lot} />
+              </div>
             </div>
             <button
               type="button"
@@ -114,17 +120,44 @@ export function PropertyDetailDrawer() {
 
             <section className="mt-6">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                Water & land characteristics
+              </h3>
+              <div className="mt-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+                <LotWaterBadges lot={lot} />
+                <p className="mt-2 text-xs text-sky-950/80">
+                  {hasWaterFeature(lot.viewType)
+                    ? "Water tags come from county assessor view type. Linear waterfront footage is not available in Phase A."
+                    : "No waterfront, pond, or river view type on county records for this parcel."}
+                </p>
+              </div>
+            </section>
+
+            <section className="mt-6">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
                 Parcel details
               </h3>
               <div className="mt-2 divide-y divide-zinc-100 rounded-xl border border-zinc-200 px-4">
                 <LineItem label="List price" value={formatCurrency(lot.price)} emphasis />
                 <LineItem
-                  label="Square footage"
+                  label="Lot size"
+                  value={formatLotSize(lot.lotSizeSqFt)}
+                />
+                <LineItem
+                  label="View type"
+                  value={lot.viewType ?? "Not on record"}
+                />
+                <LineItem
+                  label="Zoning"
+                  value={lot.zoning ?? "Not on record"}
+                />
+                <LineItem
+                  label="Living area"
                   value={
                     lot.squareFootage
-                      ? lot.squareFootage.toLocaleString()
+                      ? `${lot.squareFootage.toLocaleString()} sqft`
                       : "Not listed"
                   }
+                  detail="Structure size if a buildable pad is listed"
                 />
                 <LineItem
                   label="Bedrooms / baths"

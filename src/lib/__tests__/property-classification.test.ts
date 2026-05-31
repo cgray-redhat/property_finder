@@ -8,6 +8,7 @@ import type { EnrichedPropertyListing } from "@/types/property";
 const rentalProperty: EnrichedPropertyListing = {
   id: "home-1",
   formattedAddress: "123 Oak St",
+  addressLine1: "123 Oak St",
   city: "Austin",
   state: "TX",
   zipCode: "78723",
@@ -20,6 +21,11 @@ const rentalProperty: EnrichedPropertyListing = {
   propertyType: "Single Family",
   listedDate: null,
   daysOnMarket: 10,
+  mlsNumber: null,
+  lotSizeSqFt: 8_850,
+  viewType: null,
+  legalDescription: null,
+  zoning: null,
   rentalBenchmarks: {
     medianRent: 2200,
     averageRent: 2100,
@@ -41,6 +47,8 @@ const landLot: EnrichedPropertyListing = {
   bathrooms: null,
   squareFootage: 7500,
   propertyType: "Land",
+  lotSizeSqFt: 75_000,
+  viewType: "Waterfront",
   rentalBenchmarks: {
     medianRent: 1800,
     averageRent: 1800,

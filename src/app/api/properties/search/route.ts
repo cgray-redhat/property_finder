@@ -11,6 +11,7 @@ import {
   LISTINGS_CACHE_TTL_MS,
   LISTINGS_MAX_RESULTS,
 } from "@/lib/rentcast/cache-policy";
+import { enrichLotListingsFromRecords } from "@/lib/rentcast/lot-enrichment";
 import { parseListingFiltersFromSearchParams } from "@/lib/rentcast/listing-filters";
 import {
   createEmptySearchResponse,
@@ -166,9 +167,12 @@ export async function GET(request: Request) {
       fetchedAt,
     );
 
+    const lotEnrichment = await enrichLotListingsFromRecords(properties);
+    warnings.push(...lotEnrichment.warnings);
+
     const response = buildSearchResponse(
       zipCode,
-      properties,
+      lotEnrichment.listings,
       marketData,
       warnings,
       {

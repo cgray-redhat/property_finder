@@ -52,6 +52,7 @@ export function enrichListingsWithMarketData(
   return listings.map((listing) => ({
     id: listing.id,
     formattedAddress: listing.formattedAddress,
+    addressLine1: listing.addressLine1 ?? null,
     city: listing.city,
     state: listing.state,
     zipCode: listing.zipCode,
@@ -64,6 +65,11 @@ export function enrichListingsWithMarketData(
     propertyType: listing.propertyType ?? null,
     listedDate: listing.listedDate ?? null,
     daysOnMarket: listing.daysOnMarket ?? null,
+    mlsNumber: listing.mlsNumber ?? null,
+    lotSizeSqFt: listing.lotSize ?? null,
+    viewType: null,
+    legalDescription: null,
+    zoning: null,
     rentalBenchmarks: pickRentalBenchmarks(listing.bedrooms, rentalData),
     lastUpdated,
   }));

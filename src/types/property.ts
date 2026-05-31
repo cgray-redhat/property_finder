@@ -20,6 +20,19 @@ export type RentCastSaleListing = {
   listedDate?: string;
   daysOnMarket?: number;
   mlsNumber?: string;
+  lotSize?: number;
+};
+
+/** Property record subset from RentCast /properties (county assessor data). */
+export type RentCastPropertyRecord = {
+  id: string;
+  formattedAddress: string;
+  lotSize?: number;
+  legalDescription?: string;
+  zoning?: string;
+  features?: {
+    viewType?: string;
+  };
 };
 
 /** Bedroom-level rental statistics from RentCast market data. */
@@ -81,6 +94,7 @@ export type RentalBenchmarks = {
 export type EnrichedPropertyListing = {
   id: string;
   formattedAddress: string;
+  addressLine1: string | null;
   city: string;
   state: string;
   zipCode: string;
@@ -93,6 +107,13 @@ export type EnrichedPropertyListing = {
   propertyType: string | null;
   listedDate: string | null;
   daysOnMarket: number | null;
+  mlsNumber: string | null;
+  /** Lot area in square feet (from listing or property record). */
+  lotSizeSqFt: number | null;
+  /** County view type — may include Waterfront, Pond, River, etc. */
+  viewType: string | null;
+  legalDescription: string | null;
+  zoning: string | null;
   rentalBenchmarks: RentalBenchmarks;
   lastUpdated: string;
 };
