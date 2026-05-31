@@ -13,7 +13,7 @@ import {
 } from "@/lib/calculations";
 import { rentSourceLabel } from "@/lib/rent-estimate";
 import { formatLotSize, hasWaterFeature } from "@/lib/lot-attributes";
-import { LotExternalLinks } from "@/components/lot/LotExternalLinks";
+import { ListingExternalLinks } from "@/components/listing/ListingExternalLinks";
 import { LotWaterBadges } from "@/components/lot/LotWaterBadges";
 import { trackEvent } from "@/lib/analytics";
 
@@ -120,7 +120,7 @@ export function PropertyDetailDrawer() {
                 Listing links
               </h3>
               <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-                <LotExternalLinks lot={lot} />
+                <ListingExternalLinks listing={lot} mode="lot_finder" />
                 <p className="mt-2 text-xs text-zinc-500">
                   Opens Google Maps, Zillow, and Realtor.com in a new tab using
                   this lot&apos;s address.
@@ -260,6 +260,19 @@ export function PropertyDetailDrawer() {
           )}
 
           <section>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+              Listing links
+            </h3>
+            <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+              <ListingExternalLinks listing={property} mode="property_finder" />
+              <p className="mt-2 text-xs text-zinc-500">
+                Opens Google Maps, Zillow, and Realtor.com in a new tab using
+                this property&apos;s address.
+              </p>
+            </div>
+          </section>
+
+          <section className="mt-6">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
               Rental override
             </h3>

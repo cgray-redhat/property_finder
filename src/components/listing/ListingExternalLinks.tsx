@@ -1,47 +1,51 @@
-import type { EnrichedPropertyListing } from "@/types/property";
+import type { AppMode } from "@/lib/property-classification";
 import {
   buildGoogleMapsUrl,
   buildRealtorComUrl,
   buildZillowHomesUrl,
 } from "@/lib/listing-links";
 import { trackEvent } from "@/lib/analytics";
+import type { EnrichedPropertyListing } from "@/types/property";
 
-type LotExternalLinksProps = {
-  lot: EnrichedPropertyListing;
+type ListingExternalLinksProps = {
+  listing: EnrichedPropertyListing;
+  mode: AppMode;
   compact?: boolean;
   onNavigate?: () => void;
 };
 
 function handleLinkClick(
-  lot: EnrichedPropertyListing,
+  listing: EnrichedPropertyListing,
+  mode: AppMode,
   destination: "google_maps" | "zillow" | "realtor",
 ) {
   trackEvent("Property Listing Clicked", {
-    property_id: lot.id,
-    address: lot.formattedAddress,
+    property_id: listing.id,
+    address: listing.formattedAddress,
     action: "external_link",
     destination,
-    mode: "lot_finder",
+    mode,
   });
 }
 
-export function LotExternalLinks({
-  lot,
+export function ListingExternalLinks({
+  listing,
+  mode,
   compact = false,
   onNavigate,
-}: LotExternalLinksProps) {
+}: ListingExternalLinksProps) {
   const googleMapsUrl = buildGoogleMapsUrl(
-    lot.formattedAddress,
-    lot.latitude,
-    lot.longitude,
+    listing.formattedAddress,
+    listing.latitude,
+    listing.longitude,
   );
-  const zillowUrl = buildZillowHomesUrl(lot.formattedAddress);
+  const zillowUrl = buildZillowHomesUrl(listing.formattedAddress);
   const realtorUrl = buildRealtorComUrl({
-    formattedAddress: lot.formattedAddress,
-    addressLine1: lot.addressLine1,
-    city: lot.city,
-    state: lot.state,
-    zipCode: lot.zipCode,
+    formattedAddress: listing.formattedAddress,
+    addressLine1: listing.addressLine1,
+    city: listing.city,
+    state: listing.state,
+    zipCode: listing.zipCode,
   });
 
   const linkClass = compact
@@ -63,7 +67,7 @@ export function LotExternalLinks({
         className={linkClass}
         onClick={(event) => {
           event.stopPropagation();
-          handleLinkClick(lot, "google_maps");
+          handleLinkClick(listing, mode, "google_maps");
           onNavigate?.();
         }}
       >
@@ -76,7 +80,7 @@ export function LotExternalLinks({
         className={linkClass}
         onClick={(event) => {
           event.stopPropagation();
-          handleLinkClick(lot, "zillow");
+          handleLinkClick(listing, mode, "zillow");
           onNavigate?.();
         }}
       >
@@ -89,7 +93,7 @@ export function LotExternalLinks({
         className={linkClass}
         onClick={(event) => {
           event.stopPropagation();
-          handleLinkClick(lot, "realtor");
+          handleLinkClick(listing, mode, "realtor");
           onNavigate?.();
         }}
       >

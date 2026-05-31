@@ -14,7 +14,7 @@ import {
 } from "@/hooks/use-ranked-properties";
 import { useInvestLocateStore } from "@/store/invest-locate-store";
 import { formatLotSize } from "@/lib/lot-attributes";
-import { LotExternalLinks } from "@/components/lot/LotExternalLinks";
+import { ListingExternalLinks } from "@/components/listing/ListingExternalLinks";
 import { LotWaterBadges } from "@/components/lot/LotWaterBadges";
 import { MarketRentErrorState } from "@/components/errors/MarketRentErrorState";
 
@@ -145,14 +145,14 @@ export function DashboardList({ compact = false }: DashboardListProps) {
                         {lot.formattedAddress}
                       </p>
                       <div className="mt-1 sm:hidden">
-                        <LotExternalLinks lot={lot} compact />
+                        <ListingExternalLinks listing={lot} mode="lot_finder" compact />
                       </div>
                       <div className="mt-1 lg:hidden">
                         <LotWaterBadges lot={lot} compact />
                       </div>
                     </td>
                     <td className="hidden px-3 py-3 sm:table-cell">
-                      <LotExternalLinks lot={lot} compact />
+                      <ListingExternalLinks listing={lot} mode="lot_finder" compact />
                     </td>
                     <td className="px-3 py-3 text-zinc-700">
                       {lot.propertyType ?? "Land / Lot"}
@@ -240,6 +240,7 @@ export function DashboardList({ compact = false }: DashboardListProps) {
             <tr>
               <th className="px-3 py-3 font-medium">#</th>
               <th className="px-3 py-3 font-medium">Property</th>
+              <th className="hidden px-3 py-3 font-medium sm:table-cell">Links</th>
               <th className="px-3 py-3 font-medium">Price</th>
               <th className="hidden px-3 py-3 font-medium sm:table-cell">Rent</th>
               <th className="px-3 py-3 font-medium">Cap</th>
@@ -274,11 +275,25 @@ export function DashboardList({ compact = false }: DashboardListProps) {
                       {property.bedrooms ?? "—"} bd · {property.bathrooms ?? "—"}{" "}
                       ba
                     </p>
+                    <div className="mt-1 sm:hidden">
+                      <ListingExternalLinks
+                        listing={property}
+                        mode="property_finder"
+                        compact
+                      />
+                    </div>
                     {property.rentEstimate.isFallback && (
                       <p className="mt-1 text-xs font-medium text-amber-700">
                         Est. rent · {rentSourceLabel(property.rentEstimate.source)}
                       </p>
                     )}
+                  </td>
+                  <td className="hidden px-3 py-3 sm:table-cell">
+                    <ListingExternalLinks
+                      listing={property}
+                      mode="property_finder"
+                      compact
+                    />
                   </td>
                   <td className="px-3 py-3 tabular-nums text-zinc-900">
                     {formatCurrency(property.price)}
