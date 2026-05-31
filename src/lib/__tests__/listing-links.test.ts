@@ -1,6 +1,7 @@
 import {
   buildGoogleMapsUrl,
-  buildRealtorComUrl,
+  buildRealtorComRedirectPath,
+  buildRealtorSearchFallbackUrl,
   buildZillowHomesUrl,
 } from "@/lib/listing-links";
 
@@ -28,10 +29,33 @@ describe("buildZillowHomesUrl", () => {
   });
 });
 
-describe("buildRealtorComUrl", () => {
-  it("builds a detail URL from address parts", () => {
+describe("buildRealtorSearchFallbackUrl", () => {
+  it("prefers zip search when available", () => {
     expect(
-      buildRealtorComUrl({
+      buildRealtorSearchFallbackUrl({
+        formattedAddress: "456 Oak Ave, Hyannis, MA 02601",
+        city: "Hyannis",
+        state: "MA",
+        zipCode: "02601",
+      }),
+    ).toBe("https://www.realtor.com/realestateandhomes-search/02601");
+  });
+
+  it("falls back to city search when zip is missing", () => {
+    expect(
+      buildRealtorSearchFallbackUrl({
+        formattedAddress: "Vacant lot",
+        city: "Hyannis",
+        state: "MA",
+      }),
+    ).toBe("https://www.realtor.com/realestateandhomes-search/Hyannis_MA");
+  });
+});
+
+describe("buildRealtorComRedirectPath", () => {
+  it("builds a redirect route with address params", () => {
+    expect(
+      buildRealtorComRedirectPath({
         formattedAddress: "123 Main St, Boston, MA 02101",
         addressLine1: "123 Main St",
         city: "Boston",
@@ -39,30 +63,7 @@ describe("buildRealtorComUrl", () => {
         zipCode: "02101",
       }),
     ).toBe(
-      "https://www.realtor.com/realestateandhomes-detail/123-Main-St_Boston_MA_02101",
+      "/api/listing-links/realtor?formattedAddress=123+Main+St%2C+Boston%2C+MA+02101&addressLine1=123+Main+St&city=Boston&state=MA&zipCode=02101",
     );
-  });
-
-  it("parses formattedAddress when addressLine1 is missing", () => {
-    expect(
-      buildRealtorComUrl({
-        formattedAddress: "456 Oak Ave, Hyannis, MA 02601",
-        city: "Hyannis",
-        state: "MA",
-        zipCode: "02601",
-      }),
-    ).toBe(
-      "https://www.realtor.com/realestateandhomes-detail/456-Oak-Ave_Hyannis_MA_02601",
-    );
-  });
-
-  it("falls back to city search when address cannot be parsed", () => {
-    expect(
-      buildRealtorComUrl({
-        formattedAddress: "Vacant lot",
-        city: "Hyannis",
-        state: "MA",
-      }),
-    ).toBe("https://www.realtor.com/realestateandhomes-search/Hyannis_MA");
   });
 });

@@ -31,6 +31,8 @@ function buildRealtorDetailSlug(
   ].join("_");
 }
 
+export { buildRealtorDetailSlug };
+
 export function buildGoogleMapsUrl(
   formattedAddress: string,
   latitude?: number | null,
@@ -57,25 +59,15 @@ export function buildZillowHomesUrl(formattedAddress: string): string {
   return `https://www.zillow.com/homes/${slug}/`;
 }
 
-/** Realtor.com detail URL from address (opens matching listing when available). */
-export function buildRealtorComUrl({
+/** Realtor.com search fallback when address cannot be resolved to a listing id. */
+export function buildRealtorSearchFallbackUrl({
   formattedAddress,
-  addressLine1,
   city,
   state,
   zipCode,
 }: ListingLinkAddress): string {
-  if (addressLine1 && city && state && zipCode) {
-    return `https://www.realtor.com/realestateandhomes-detail/${buildRealtorDetailSlug(addressLine1, city, state, zipCode)}`;
-  }
-
-  const parsed = formattedAddress.match(
-    /^(.+?),\s*([^,]+),\s*([A-Za-z]{2})\s*(\d{5}(?:-\d{4})?)$/,
-  );
-
-  if (parsed) {
-    const [, street, parsedCity, parsedState, parsedZip] = parsed;
-    return `https://www.realtor.com/realestateandhomes-detail/${buildRealtorDetailSlug(street, parsedCity, parsedState, parsedZip)}`;
+  if (zipCode) {
+    return `https://www.realtor.com/realestateandhomes-search/${zipCode.trim().split("-")[0]}`;
   }
 
   if (city && state) {
@@ -83,4 +75,40 @@ export function buildRealtorComUrl({
   }
 
   return `https://www.realtor.com/realestateandhomes-search/${encodeURIComponent(formattedAddress)}`;
+}
+
+/** Server redirect route that resolves Realtor.com listing ids before opening. */
+export function buildRealtorComRedirectPath({
+  formattedAddress,
+  addressLine1,
+  city,
+  state,
+  zipCode,
+}: ListingLinkAddress): string {
+  const params = new URLSearchParams({
+    formattedAddress,
+  });
+
+  if (addressLine1) {
+    params.set("addressLine1", addressLine1);
+  }
+
+  if (city) {
+    params.set("city", city);
+  }
+
+  if (state) {
+    params.set("state", state);
+  }
+
+  if (zipCode) {
+    params.set("zipCode", zipCode);
+  }
+
+  return `/api/listing-links/realtor?${params.toString()}`;
+}
+
+/** @deprecated Use buildRealtorComRedirectPath — detail slugs without listing ids 404. */
+export function buildRealtorComUrl(address: ListingLinkAddress): string {
+  return buildRealtorComRedirectPath(address);
 }

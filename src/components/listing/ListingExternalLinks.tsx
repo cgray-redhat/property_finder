@@ -1,7 +1,7 @@
 import type { AppMode } from "@/lib/property-classification";
 import {
   buildGoogleMapsUrl,
-  buildRealtorComUrl,
+  buildRealtorComRedirectPath,
   buildZillowHomesUrl,
 } from "@/lib/listing-links";
 import { trackEvent } from "@/lib/analytics";
@@ -40,7 +40,7 @@ export function ListingExternalLinks({
     listing.longitude,
   );
   const zillowUrl = buildZillowHomesUrl(listing.formattedAddress);
-  const realtorUrl = buildRealtorComUrl({
+  const realtorUrl = buildRealtorComRedirectPath({
     formattedAddress: listing.formattedAddress,
     addressLine1: listing.addressLine1,
     city: listing.city,
