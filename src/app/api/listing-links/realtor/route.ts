@@ -4,6 +4,8 @@ import {
 } from "@/lib/listing-links";
 import { resolveRealtorComUrl } from "@/lib/realtor-suggest";
 
+export const runtime = "nodejs";
+
 function parseAddressFromSearchParams(
   searchParams: URLSearchParams,
 ): ListingLinkAddress | null {

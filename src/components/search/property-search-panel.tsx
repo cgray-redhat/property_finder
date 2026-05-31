@@ -36,12 +36,6 @@ export function PropertySearchPanel() {
   const setSearchFilters = useInvestLocateStore((state) => state.setSearchFilters);
 
   useEffect(() => {
-    if (searchResults?.zipCode) {
-      setZipCode(searchResults.zipCode);
-    }
-  }, [searchResults?.zipCode]);
-
-  useEffect(() => {
     if (searchResults?.meta.appliedFilters) {
       setSearchFilters(searchResults.meta.appliedFilters);
     }
@@ -87,6 +81,7 @@ export function PropertySearchPanel() {
     }
 
     setSearchResults(data);
+    setZipCode(data.zipCode);
     return data;
   }
 
