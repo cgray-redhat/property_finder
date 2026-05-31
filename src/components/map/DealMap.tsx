@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { getCapRateColor } from "@/lib/rank-properties";
@@ -16,8 +16,17 @@ import type { RankedProperty } from "@/lib/rank-properties";
 
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 const LOT_PIN_COLOR = "#6366f1";
+const PIN_HIT_SIZE_PX = 24;
+const PIN_DEFAULT_SIZE_PX = 14;
+const PIN_SELECTED_SIZE_PX = 18;
 
 type MappableListing = EnrichedPropertyListing | RankedProperty;
+
+type MarkerRecord = {
+  marker: mapboxgl.Marker;
+  element: HTMLElement;
+  color: string;
+};
 
 function getPinColor(listing: MappableListing, isLotMode: boolean): string {
   if (isLotMode) {
@@ -29,10 +38,25 @@ function getPinColor(listing: MappableListing, isLotMode: boolean): string {
   );
 }
 
+function applyPinSelectionStyle(
+  element: HTMLElement,
+  color: string,
+  isSelected: boolean,
+): void {
+  const size = isSelected ? PIN_SELECTED_SIZE_PX : PIN_DEFAULT_SIZE_PX;
+
+  element.style.width = `${size}px`;
+  element.style.height = `${size}px`;
+  element.style.backgroundColor = color;
+  element.style.outline = isSelected ? `3px solid ${color}` : "none";
+  element.style.outlineOffset = "2px";
+  element.setAttribute("aria-pressed", isSelected ? "true" : "false");
+}
+
 export function DealMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const markersByIdRef = useRef<Map<string, MarkerRecord>>(new Map());
   const appMode = useAppMode();
   const isLotMode = appMode === "lot_finder";
   const rankedProperties = useRankedProperties();
@@ -47,6 +71,17 @@ export function DealMap() {
     (state) => state.setSelectedPropertyId,
   );
   const searchResults = useInvestLocateStore((state) => state.searchResults);
+
+  const listingsKey = useMemo(
+    () =>
+      mapListings
+        .map(
+          (property) =>
+            `${property.id}:${property.latitude}:${property.longitude}`,
+        )
+        .join("|"),
+    [mapListings],
+  );
 
   const mappableCount = mapListings.filter(
     (property) => property.latitude != null && property.longitude != null,
@@ -70,8 +105,8 @@ export function DealMap() {
     mapRef.current = map;
 
     return () => {
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
+      markersByIdRef.current.forEach(({ marker }) => marker.remove());
+      markersByIdRef.current.clear();
       map.remove();
       mapRef.current = null;
     };
@@ -83,8 +118,8 @@ export function DealMap() {
       return;
     }
 
-    markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = [];
+    markersByIdRef.current.forEach(({ marker }) => marker.remove());
+    markersByIdRef.current.clear();
 
     const mappable = mapListings.filter(
       (property) => property.latitude != null && property.longitude != null,
@@ -103,20 +138,22 @@ export function DealMap() {
       }
 
       const color = getPinColor(property, isLotMode);
-      const isSelected = property.id === selectedPropertyId;
-      const size = isSelected ? 18 : 14;
 
       const markerElement = document.createElement("button");
       markerElement.type = "button";
       markerElement.title = property.formattedAddress;
       markerElement.className =
-        "cursor-pointer border-2 border-white shadow-md transition-transform hover:scale-110";
-      markerElement.style.width = `${size}px`;
-      markerElement.style.height = `${size}px`;
+        "flex cursor-pointer items-center justify-center border-0 bg-transparent p-0";
+      markerElement.style.width = `${PIN_HIT_SIZE_PX}px`;
+      markerElement.style.height = `${PIN_HIT_SIZE_PX}px`;
       markerElement.style.borderRadius = "9999px";
-      markerElement.style.backgroundColor = color;
-      markerElement.style.outline = isSelected ? `3px solid ${color}` : "none";
-      markerElement.style.outlineOffset = "2px";
+
+      const pinDot = document.createElement("span");
+      pinDot.className = "block rounded-full border-2 border-white shadow-md";
+      pinDot.style.pointerEvents = "none";
+      markerElement.appendChild(pinDot);
+
+      applyPinSelectionStyle(pinDot, color, false);
 
       markerElement.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -131,23 +168,33 @@ export function DealMap() {
         });
       });
 
-      const marker = new mapboxgl.Marker({ element: markerElement })
+      const marker = new mapboxgl.Marker({
+        element: markerElement,
+        anchor: "center",
+      })
         .setLngLat([longitude, latitude])
         .addTo(map);
 
-      markersRef.current.push(marker);
+      markersByIdRef.current.set(property.id, {
+        marker,
+        element: pinDot,
+        color,
+      });
       bounds.extend([longitude, latitude]);
     }
 
-    map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 });
-  }, [
-    mapListings,
-    isLotMode,
-    selectedPropertyId,
-    setSelectedPropertyId,
-    searchResults,
-    appMode,
-  ]);
+    map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 0 });
+  }, [listingsKey, isLotMode, setSelectedPropertyId, searchResults?.zipCode, appMode]);
+
+  useEffect(() => {
+    markersByIdRef.current.forEach(({ element, color }, propertyId) => {
+      applyPinSelectionStyle(
+        element,
+        color,
+        propertyId === selectedPropertyId,
+      );
+    });
+  }, [selectedPropertyId]);
 
   if (!MAPBOX_TOKEN) {
     return (
