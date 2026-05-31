@@ -3,6 +3,7 @@
 import {
   AppHeader,
   DashboardList,
+  PropertyDetailDrawer,
   PropertySearchPanel,
   WhatIfSidebar,
 } from "@/components";
@@ -37,6 +38,7 @@ export default function Home() {
           {!isLotMode && <WhatIfSidebar />}
         </div>
       </main>
+      <PropertyDetailDrawer />
     </>
   );
 }

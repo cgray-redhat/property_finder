@@ -118,6 +118,7 @@ export function DashboardList({ compact = false }: DashboardListProps) {
               <tr>
                 <th className="px-3 py-3 font-medium">#</th>
                 <th className="px-3 py-3 font-medium">Property</th>
+                <th className="hidden px-3 py-3 font-medium sm:table-cell">Links</th>
                 <th className="px-3 py-3 font-medium">Type</th>
                 <th className="px-3 py-3 font-medium">Price</th>
                 <th className="hidden px-3 py-3 font-medium md:table-cell">Lot size</th>
@@ -143,12 +144,15 @@ export function DashboardList({ compact = false }: DashboardListProps) {
                       <p className="font-medium text-zinc-900">
                         {lot.formattedAddress}
                       </p>
-                      <div className="mt-1.5">
+                      <div className="mt-1 sm:hidden">
                         <LotExternalLinks lot={lot} compact />
                       </div>
                       <div className="mt-1 lg:hidden">
                         <LotWaterBadges lot={lot} compact />
                       </div>
+                    </td>
+                    <td className="hidden px-3 py-3 sm:table-cell">
+                      <LotExternalLinks lot={lot} compact />
                     </td>
                     <td className="px-3 py-3 text-zinc-700">
                       {lot.propertyType ?? "Land / Lot"}

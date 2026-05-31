@@ -96,9 +96,6 @@ export function PropertyDetailDrawer() {
               <p className="mt-1 text-sm text-zinc-600">
                 {lot.propertyType ?? "Land / Lot"} · {formatCurrency(lot.price)}
               </p>
-              <div className="mt-3">
-                <LotExternalLinks lot={lot} />
-              </div>
             </div>
             <button
               type="button"
@@ -116,6 +113,19 @@ export function PropertyDetailDrawer() {
                 Rental cash-flow metrics are not applied to vacant lots. Use
                 Property Finder for income-producing homes and rentals.
               </p>
+            </section>
+
+            <section className="mt-6">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+                Listing links
+              </h3>
+              <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+                <LotExternalLinks lot={lot} />
+                <p className="mt-2 text-xs text-zinc-500">
+                  Opens Google Maps, Zillow, and Realtor.com in a new tab using
+                  this lot&apos;s address.
+                </p>
+              </div>
             </section>
 
             <section className="mt-6">
