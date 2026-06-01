@@ -241,6 +241,7 @@ export function DashboardList({ compact = false }: DashboardListProps) {
               <th className="px-3 py-3 font-medium">#</th>
               <th className="px-3 py-3 font-medium">Property</th>
               <th className="hidden px-3 py-3 font-medium sm:table-cell">Links</th>
+              <th className="px-3 py-3 font-medium">Type</th>
               <th className="px-3 py-3 font-medium">Price</th>
               <th className="hidden px-3 py-3 font-medium sm:table-cell">Rent</th>
               <th className="px-3 py-3 font-medium">Cap</th>
@@ -294,6 +295,9 @@ export function DashboardList({ compact = false }: DashboardListProps) {
                       mode="property_finder"
                       compact
                     />
+                  </td>
+                  <td className="px-3 py-3 text-zinc-700">
+                    {property.propertyType ?? "Residential"}
                   </td>
                   <td className="px-3 py-3 tabular-nums text-zinc-900">
                     {formatCurrency(property.price)}
